@@ -1,0 +1,813 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Muscle-Memory Typing Test</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Typing Test">
+<meta name="format-detection" content="telephone=no">
+<meta name="theme-color" content="#f6f6f3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121214" media="(prefers-color-scheme: dark)">
+<style>
+:root {
+  --bg: #f6f6f3; --fg: #1b1b1f; --muted: #6b6b73; --card: #ffffff; --line: #e2e2dd;
+  --accent: #2f5bea; --accent-fg: #fff; --good: #1d8a4a; --bad: #c8372c; --miss: #b0b0b6;
+  --safe-t: env(safe-area-inset-top); --safe-b: env(safe-area-inset-bottom);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121214; --fg: #ececf0; --muted: #9a9aa4; --card: #1c1c20; --line: #2c2c32;
+    --accent: #6b8cff; --accent-fg: #0b0b10; --good: #4cc47d; --bad: #ff6b5e; --miss: #5a5a62;
+  }
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; height: 100%; background: var(--bg); color: var(--fg);
+  font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+  overscroll-behavior: none; -webkit-text-size-adjust: 100%; -webkit-tap-highlight-color: transparent;
+}
+body { overflow: hidden; }
+button { font: inherit; color: inherit; }
+
+.screen { position: fixed; inset: 0; display: none; flex-direction: column; background: var(--bg); }
+.screen.on { display: flex; }
+.scroll { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.page { width: 100%; max-width: 560px; margin: 0 auto; padding: calc(24px + var(--safe-t)) 20px calc(32px + var(--safe-b)); }
+
+h1 { font-size: 28px; line-height: 1.15; margin: 8px 0 6px; letter-spacing: -0.02em; }
+h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 28px 0 8px; }
+.lede { font-size: 18px; color: var(--muted); margin: 0 0 8px; }
+p { margin: 0 0 12px; }
+ol.steps { margin: 0; padding: 0; list-style: none; counter-reset: s; }
+ol.steps li { counter-increment: s; position: relative; padding: 0 0 12px 38px; }
+ol.steps li::before {
+  content: counter(s); position: absolute; left: 0; top: 0; width: 26px; height: 26px; border-radius: 50%;
+  background: var(--card); border: 1px solid var(--line); font-size: 13px; font-weight: 600;
+  display: flex; align-items: center; justify-content: center;
+}
+.note { font-size: 14px; color: var(--muted); background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.btn {
+  display: block; width: 100%; border: 0; border-radius: 14px; padding: 16px; font-size: 17px; font-weight: 600;
+  background: var(--accent); color: var(--accent-fg); cursor: pointer; touch-action: manipulation;
+}
+.btn.ghost { background: var(--card); color: var(--fg); border: 1px solid var(--line); font-weight: 500; }
+.btn:disabled { opacity: .5; }
+.btn:active { filter: brightness(.92); }
+.linkbtn { background: none; border: 0; color: var(--accent); padding: 14px; width: 100%; font-size: 15px; cursor: pointer; }
+.actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; }
+.actions .wide { grid-column: 1 / -1; }
+
+/* Trial */
+.stage { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: calc(12px + var(--safe-t)) 16px 12px; text-align: center; user-select: none; -webkit-user-select: none; }
+.prog { font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.word { font-size: clamp(34px, 11vw, 52px); font-weight: 700; letter-spacing: .02em; min-height: 1.3em; margin: 6px 0; }
+.hint { font-size: 14px; color: var(--muted); }
+
+/* Result */
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 16px 0 4px; }
+.tile { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; }
+.tile b { display: block; font-size: 26px; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.tile span { font-size: 13px; color: var(--muted); }
+.rows { display: flex; flex-direction: column; gap: 8px; }
+.row { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 14px; }
+.row .t { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.row .target { font-weight: 600; }
+.row .typed { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 17px; letter-spacing: .04em; word-break: break-all; }
+.row .stats { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.ok { color: var(--good); } .bad { color: var(--bad); text-decoration: underline; text-decoration-thickness: 2px; } .miss { color: var(--miss); }
+.badge { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 99px; background: var(--line); }
+.badge.good { background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--good); }
+
+/* Replay */
+.rp-top { display: flex; align-items: center; justify-content: space-between; padding: calc(8px + var(--safe-t)) 8px 0; }
+.rp-top button { background: none; border: 0; color: var(--accent); font-size: 16px; padding: 10px 12px; cursor: pointer; }
+.rp-typed { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 26px; min-height: 1.4em; letter-spacing: .04em; }
+.rp-typed::after { content: ""; display: inline-block; width: 2px; height: 1em; vertical-align: -0.12em; background: var(--accent); margin-left: 1px; }
+.rp-ctrl { display: flex; align-items: center; gap: 8px; margin-top: 12px; width: 100%; max-width: 420px; }
+.rp-ctrl button { flex: none; min-width: 44px; height: 40px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); cursor: pointer; font-size: 15px; font-variant-numeric: tabular-nums; }
+.rp-ctrl input { flex: 1; min-width: 0; accent-color: var(--accent); }
+.rp-time { font-variant-numeric: tabular-nums; font-size: 14px; color: var(--muted); }
+
+#toast { position: fixed; left: 50%; bottom: calc(24px + var(--safe-b)); transform: translateX(-50%) translateY(20px); opacity: 0; transition: .2s; background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 14px; pointer-events: none; z-index: 20; }
+#toast.on { opacity: 1; transform: translateX(-50%); }
+#rotate { position: fixed; inset: 0; z-index: 30; background: var(--bg); display: none; align-items: center; justify-content: center; text-align: center; padding: 24px; font-size: 18px; }
+@media (orientation: landscape) and (max-height: 520px) { #rotate { display: flex; } }
+
+/* ---------- Keyboard skins ---------- */
+.kb { position: relative; flex: none; width: 100%; background: var(--kb-bg); touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; overflow: hidden; }
+.kb .key {
+  position: absolute; display: flex; align-items: center; justify-content: center;
+  background: var(--kb-key); color: var(--kb-fg); border-radius: var(--kb-r); box-shadow: var(--kb-shadow);
+  font-family: var(--kb-font); font-size: var(--kb-fs); font-weight: 400; line-height: 1; pointer-events: none;
+}
+.kb .key.sp { background: var(--kb-sp); font-size: 16px; }
+.kb .key.space { font-size: 15px; color: var(--kb-fg2); }
+.kb .key.enter { background: var(--kb-enter); color: var(--kb-enter-fg); font-size: min(16px, 3.7vw); white-space: nowrap; }
+.kb .key.bare { background: none; box-shadow: none; color: var(--kb-fg2); }
+.kb .key.down { background: var(--kb-down); }
+.kb .key.sp.down, .kb .key.enter.down { filter: brightness(.85); }
+.kb .key svg { width: 24px; height: 24px; }
+.kb .dots { position: absolute; inset: 0; pointer-events: none; }
+.kb .dot { position: absolute; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; background: #ff3b30; border: 2px solid #fff; }
+.kb .dot.old { width: 8px; height: 8px; margin: -4px 0 0 -4px; border: 0; opacity: .45; }
+
+.kb[data-skin=ios] {
+  --kb-bg: #d1d4da; --kb-key: #fff; --kb-sp: #abb0bb; --kb-fg: #000; --kb-fg2: #000; --kb-down: #d9dbe0;
+  --kb-enter: #007aff; --kb-enter-fg: #fff; --kb-r: 5px; --kb-shadow: 0 1px 0 rgba(0,0,0,.3);
+  --kb-font: -apple-system, "SF Pro Text", system-ui, sans-serif; --kb-fs: 24px;
+}
+.kb[data-skin=gboard] {
+  --kb-bg: #e9ecf1; --kb-key: #fff; --kb-sp: #cdd4df; --kb-fg: #1f1f1f; --kb-fg2: #5f6368; --kb-down: #d3d8e0;
+  --kb-enter: #1a73e8; --kb-enter-fg: #fff; --kb-r: 7px; --kb-shadow: none;
+  --kb-font: Roboto, "Google Sans", system-ui, sans-serif; --kb-fs: 22px;
+}
+.kb[data-skin=samsung] {
+  --kb-bg: #f1f1f1; --kb-key: #fdfdfd; --kb-sp: #e2e2e2; --kb-fg: #111; --kb-fg2: #6b6b6b; --kb-down: #d6d6d6;
+  --kb-enter: #e2e2e2; --kb-enter-fg: #111; --kb-r: 9px; --kb-shadow: none;
+  --kb-font: "SamsungOne", Roboto, system-ui, sans-serif; --kb-fs: 22px;
+}
+@media (prefers-color-scheme: dark) {
+  .kb[data-skin=ios] { --kb-bg: #2b2b2d; --kb-key: #6b6b6d; --kb-sp: #464648; --kb-fg: #fff; --kb-fg2: #fff; --kb-down: #8a8a8c; --kb-enter: #0a84ff; --kb-shadow: 0 1px 0 rgba(0,0,0,.6); }
+  .kb[data-skin=gboard] { --kb-bg: #1f2024; --kb-key: #3b3c40; --kb-sp: #2c2d31; --kb-fg: #e8eaed; --kb-fg2: #9aa0a6; --kb-down: #54565b; --kb-enter: #8ab4f8; --kb-enter-fg: #1f1f1f; }
+  .kb[data-skin=samsung] { --kb-bg: #101010; --kb-key: #2b2b2b; --kb-sp: #1e1e1e; --kb-fg: #f2f2f2; --kb-fg2: #9a9a9a; --kb-down: #444; --kb-enter: #1e1e1e; --kb-enter-fg: #f2f2f2; }
+}
+</style>
+</head>
+<body>
+
+<section id="s-intro" class="screen scroll on">
+  <div class="page">
+    <h1>Muscle-Memory Typing Test</h1>
+    <p class="lede">How well do your thumbs know the keyboard?</p>
+
+    <h2>Why this test</h2>
+    <p>Typing on a phone is an <em>embodied skill</em>. After thousands of messages, your thumbs know where each key is. You no longer look for letters: your hands type from muscle memory, and your conscious mind barely takes part.</p>
+    <p>This test measures how automatic that skill has become. The keyboard below looks like the one you use every day, but almost every key label is hidden, so you can't find letters by sight and can only rely on memory. The app records your speed, your accuracy and exactly where each tap lands, so your typing can be replayed and studied later.</p>
+
+    <h2>How it works</h2>
+    <ol class="steps">
+      <li>Hold your phone the way you normally do when texting (one thumb, two thumbs, whatever feels natural).</li>
+      <li>Tap <b>Start</b>. A word appears at the top of the screen.</li>
+      <li>Type the word on the keyboard below. Most key labels are blank. Only the word's <b>first letter</b> and a couple of random keys are labelled.</li>
+      <li>What you type is <b>hidden</b>, so don't look for it. Keep going as you would normally.</li>
+      <li>If you <em>feel</em> you made a mistake, you can fix it with <b>⌫</b>. When you think the word is done, tap <b>Submit</b>.</li>
+      <li>Repeat this for <b id="n-words">10</b> words.</li>
+      <li>Check your results, then tap <b>Share</b> to send your recording to the researcher.</li>
+    </ol>
+    <p class="note">Type as naturally and quickly as you would in a message. Don't aim for perfection: mistakes are part of what's being measured. No personal or device information is collected, only the words and your taps.</p>
+    <p class="note" id="ios-hint" hidden>For a true full-screen view on iPhone, tap <b>Share → Add to Home Screen</b> and open the test from your home screen.</p>
+
+    <div style="margin-top:24px">
+      <button class="btn" id="btn-start">Start</button>
+      <button class="linkbtn" id="btn-load">Load a recording (.json)</button>
+      <input type="file" id="file" accept=".json,.txt,application/json,text/plain" hidden>
+    </div>
+  </div>
+</section>
+
+<section id="s-trial" class="screen">
+  <div class="stage">
+    <div class="prog" id="t-prog"></div>
+    <div class="word" id="t-word"></div>
+    <div class="hint" id="t-hint">Type it from memory, then tap Submit</div>
+  </div>
+  <div class="kbhost" id="t-kb"></div>
+</section>
+
+<section id="s-result" class="screen scroll">
+  <div class="page">
+    <h1 id="r-title">Your results</h1>
+    <div class="tiles" id="r-tiles"></div>
+    <h2>Word by word</h2>
+    <div class="rows" id="r-rows"></div>
+    <div class="actions">
+      <button class="btn wide" id="btn-share">Share recording</button>
+      <button class="btn ghost" id="btn-replay">Replay</button>
+      <button class="btn ghost" id="btn-copy" disabled>Copy link</button>
+      <button class="btn ghost wide" id="btn-again">Play again</button>
+    </div>
+  </div>
+</section>
+
+<section id="s-replay" class="screen">
+  <div class="rp-top">
+    <button id="rp-back">‹ Results</button>
+    <span class="rp-time" id="rp-pos"></span>
+    <button id="rp-speed">1×</button>
+  </div>
+  <div class="stage">
+    <div class="prog" id="rp-target"></div>
+    <div class="rp-typed" id="rp-typed"></div>
+    <div class="rp-time" id="rp-time">0.00 s</div>
+    <div class="rp-ctrl">
+      <button id="rp-prev" aria-label="Previous word">‹</button>
+      <button id="rp-play" aria-label="Play">▶</button>
+      <input type="range" id="rp-scrub" min="0" max="1000" value="0" aria-label="Position">
+      <button id="rp-next" aria-label="Next word">›</button>
+    </div>
+  </div>
+  <div class="kbhost" id="rp-kb"></div>
+</section>
+
+<div id="rotate">Please turn your phone back to portrait.</div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+// ---------- Config ----------
+const WORDS = [
+  'because', 'tomorrow', 'tonight', 'thanks', 'really', 'people', 'should', 'something', 'anything', 'actually',
+  'probably', 'morning', 'already', 'weekend', 'birthday', 'dinner', 'pretty', 'little', 'getting', 'coming',
+];
+const LETTERS = 'abcdefghijklmnopqrstuvwxyz';
+const params = new URLSearchParams(location.search);
+const N = Math.max(1, Math.min(WORDS.length, parseInt(params.get('n'), 10) || 10));
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
+
+// ---------- Seeded RNG ----------
+function rng(seed) {
+  let h = 1779033703 ^ seed.length;
+  for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 3432918353), h = h << 13 | h >>> 19;
+  let a = h >>> 0;
+  return () => { // mulberry32
+    a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function shuffle(arr, r) {
+  for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
+  return arr;
+}
+
+// ---------- Platform detection ----------
+const UA = navigator.userAgent;
+const IS_IOS = /iPhone|iPad|iPod/.test(UA) || (/Macintosh/.test(UA) && navigator.maxTouchPoints > 1);
+const HAS_NOTCH = IS_IOS && Math.max(screen.width, screen.height) / Math.min(screen.width, screen.height) > 2;
+
+function detectSkin() {
+  const forced = params.get('kb');
+  if (SKINS[forced]) return Promise.resolve(forced);
+  if (IS_IOS) return Promise.resolve('ios');
+  if (!/Android/.test(UA)) return Promise.resolve('gboard');
+  if (/SM-|Samsung/i.test(UA)) return Promise.resolve('samsung');
+  // Chrome's reduced UA hides the model; ask for it (Samsung models start with SM-).
+  const uad = navigator.userAgentData;
+  if (!uad || !uad.getHighEntropyValues) return Promise.resolve('gboard');
+  return uad.getHighEntropyValues(['model'])
+    .then(v => /^SM-/i.test(v.model || '') ? 'samsung' : 'gboard')
+    .catch(() => 'gboard');
+}
+
+// ---------- Keyboard skins ----------
+// x/w are fractions of keyboard width; y/h are px from the top of the key area.
+// Heights stay fixed in px across screen widths, as native keyboards do.
+function unitRow(keys, y, h, gap, spec) {
+  let x = 0;
+  for (const [k, w, label] of spec) {
+    if (k !== null) keys.push({ k, label, x: x / 10 + gap / 2, w: w / 10 - gap, y, h });
+    x += w;
+  }
+}
+const chars = s => [...s].map(c => [c, 1]);
+
+const SKINS = {
+  // iPhone portrait, measured in pt on a 390pt-wide screen.
+  ios(notch) {
+    const P = v => v / 390, keys = [];
+    const row = (str, x0, y) => [...str].forEach((c, i) => keys.push({ k: c, x: P(x0 + 39 * i), w: P(33), y, h: 42 }));
+    row('qwertyuiop', 3, 8);
+    row('asdfghjkl', 22.5, 62);
+    row('zxcvbnm', 61.5, 116);
+    keys.push(
+      { k: 'shift', x: P(3), w: P(42), y: 116, h: 42 },
+      { k: '<', x: P(345), w: P(42), y: 116, h: 42 },
+      { k: '123', label: '123', x: P(3), w: P(43), y: 170, h: 42 },
+      { k: 'emoji', x: P(52), w: P(43), y: 170, h: 42 },
+      { k: ' ', label: 'space', x: P(101), w: P(190), y: 170, h: 42 },
+      { k: 'enter', x: P(297), w: P(90), y: 170, h: 42 },
+    );
+    if (notch) keys.push({ k: 'globe', x: P(10), w: P(52), y: 220, h: 40 }, { k: 'mic', x: P(328), w: P(52), y: 220, h: 40 });
+    return { toolbar: 44, areaH: 216, strip: notch ? 48 : 0, keys };
+  },
+  // Gboard, 10-unit grid on a ~411dp-wide screen.
+  gboard() {
+    const keys = [], g = 6 / 411, r = (y, spec) => unitRow(keys, y, 46, g, spec);
+    r(6, chars('qwertyuiop'));
+    r(62, [[null, .5], ...chars('asdfghjkl')]);
+    r(118, [['shift', 1.5], ...chars('zxcvbnm'), ['<', 1.5]]);
+    r(174, [['123', 1.5, '?123'], [',', 1, ','], ['emoji', 1], [' ', 4, ''], ['.', 1, '.'], ['enter', 1.5]]);
+    return { toolbar: 48, areaH: 228, strip: 0, keys };
+  },
+  // Samsung Keyboard (One UI), ~360dp-wide screen.
+  samsung() {
+    const keys = [], g = 5 / 360, r = (y, spec) => unitRow(keys, y, 44, g, spec);
+    r(6, chars('qwertyuiop'));
+    r(58, [[null, .5], ...chars('asdfghjkl')]);
+    r(110, [['shift', 1.5], ...chars('zxcvbnm'), ['<', 1.5]]);
+    r(162, [['123', 1.5, '!#1'], [',', 1, ','], [' ', 5, 'English (US)'], ['.', 1, '.'], ['enter', 1.5]]);
+    return { toolbar: 44, areaH: 214, strip: 0, keys };
+  },
+};
+
+const ICONS = {
+  shift: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 4l8 8.5h-4.5V19h-7v-6.5H4z"/></svg>',
+  '<': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M9 5h11a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H9l-6.5-7z"/><path d="M11.5 9.5l5 5m0-5l-5 5"/></svg>',
+  emoji: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 14.2c1.9 2.2 5.1 2.2 7 0"/><circle cx="9.2" cy="10" r=".6" fill="currentColor"/><circle cx="14.8" cy="10" r=".6" fill="currentColor"/></svg>',
+  globe: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="8.5"/><ellipse cx="12" cy="12" rx="3.8" ry="8.5"/><path d="M3.5 12h17M5 7.5h14M5 16.5h14"/></svg>',
+  mic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="9" y="3.5" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3"/></svg>',
+};
+const isLetter = k => k.length === 1 && k >= 'a' && k <= 'z';
+const isTyping = k => isLetter(k) || k === ' ' || k === '<';
+
+class Keyboard {
+  constructor(host, skin, opts = {}) {
+    this.skin = skin;
+    this.opts = opts;
+    this.enabled = false;
+    this.active = new Map();
+    const s = this.s = SKINS[skin](skin === 'ios' && HAS_NOTCH);
+    const el = this.el = document.createElement('div');
+    el.className = 'kb';
+    el.dataset.skin = skin;
+    el.style.height = `calc(${s.toolbar + s.areaH + s.strip}px + env(safe-area-inset-bottom))`;
+    for (const key of s.keys) {
+      const d = key.el = document.createElement('div');
+      d.className = 'key ' + (isLetter(key.k) ? 'L' : key.k === ' ' ? 'space' : key.k === 'enter' ? 'enter'
+        : key.k === 'globe' || key.k === 'mic' ? 'bare' : 'sp');
+      if (key.k === 'enter') d.textContent = 'Submit';
+      else if (ICONS[key.k]) d.innerHTML = ICONS[key.k];
+      else if (key.label != null) d.textContent = key.label;
+      el.appendChild(d);
+    }
+    this.dotLayer = document.createElement('div');
+    this.dotLayer.className = 'dots';
+    el.appendChild(this.dotLayer);
+
+    // Rows for hit-testing: main rows split at the midpoints between them; strip row is separate.
+    const ys = [...new Set(s.keys.filter(k => k.y < s.areaH).map(k => k.y))].sort((a, b) => a - b);
+    this.rows = ys.map(y => s.keys.filter(k => k.y === y));
+    this.bounds = ys.slice(1).map((y, i) => (ys[i] + this.rows[i][0].h + y) / 2);
+    this.stripRow = s.keys.filter(k => k.y >= s.areaH);
+
+    host.replaceChildren(el);
+    this.layout();
+    if (window.ResizeObserver) new ResizeObserver(() => this.layout()).observe(el);
+    else addEventListener('resize', () => this.layout());
+    if (opts.onPress) this.bind();
+  }
+
+  layout() {
+    const W = this.W = this.el.clientWidth || innerWidth;
+    for (const k of this.s.keys) {
+      Object.assign(k.el.style, {
+        left: k.x * W + 'px', width: k.w * W + 'px', top: this.s.toolbar + k.y + 'px', height: k.h + 'px',
+      });
+    }
+  }
+
+  setLabels(visible) { // visible: Set of letters, or null for all
+    for (const k of this.s.keys) if (isLetter(k.k)) k.el.textContent = !visible || visible.has(k.k) ? k.k : '';
+  }
+
+  hit(px, py) {
+    const y = py - this.s.toolbar, W = this.W;
+    if (y < -6) return null; // taps on the (empty) suggestion strip do nothing
+    const dx = k => Math.max(k.x * W - px, 0, px - (k.x + k.w) * W);
+    let row;
+    if (y >= this.s.areaH) {
+      row = this.stripRow.filter(k => dx(k) < 16 && y >= k.y - 12 && y <= k.y + k.h + 12);
+    } else {
+      let r = 0;
+      while (r < this.bounds.length && y >= this.bounds[r]) r++;
+      row = this.rows[r];
+    }
+    let best = null, bd = Infinity;
+    for (const k of row) { const d = dx(k); if (d < bd) bd = d, best = k; }
+    return best;
+  }
+
+  norm(px, py) { return [Math.round(px / this.W * 1000), Math.round((py - this.s.toolbar) / this.s.areaH * 1000)]; }
+  denorm(nx, ny) { return [nx / 1000 * this.W, this.s.toolbar + ny / 1000 * this.s.areaH]; }
+
+  bind() {
+    const el = this.el;
+    const now = e => {
+      const p = performance.now();
+      return e.timeStamp > 0 && Math.abs(p - e.timeStamp) < 1000 ? e.timeStamp : p;
+    };
+    el.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      if (!this.enabled) return;
+      const r = el.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
+      const key = this.hit(px, py);
+      if (!key) return;
+      try { el.setPointerCapture(e.pointerId); } catch (_) {}
+      const [nx, ny] = this.norm(px, py);
+      this.active.set(e.pointerId, { key, t: now(e), nx, ny });
+      key.el.classList.add('down');
+    });
+    const end = (e, commit) => {
+      const a = this.active.get(e.pointerId);
+      if (!a) return;
+      this.active.delete(e.pointerId);
+      if (![...this.active.values()].some(o => o.key === a.key)) a.key.el.classList.remove('down');
+      if (commit && this.enabled) this.opts.onPress({ k: a.key.k, t: a.t, hold: now(e) - a.t, x: a.nx, y: a.ny });
+    };
+    el.addEventListener('pointerup', e => end(e, true));
+    el.addEventListener('pointercancel', e => end(e, false));
+    el.addEventListener('contextmenu', e => e.preventDefault());
+    // Stop the follow-up "click" from landing on whatever replaces the keyboard (e.g. result buttons).
+    for (const t of ['touchstart', 'touchend']) el.addEventListener(t, e => e.preventDefault(), { passive: false });
+  }
+
+  cancelAll() {
+    for (const a of this.active.values()) a.key.el.classList.remove('down');
+    this.active.clear();
+  }
+
+  // Replay rendering
+  showDown(keys) { for (const k of this.s.keys) k.el.classList.toggle('down', keys.has(k.k)); }
+  showDots(dots) { // [{x, y, old}]
+    this.dotLayer.innerHTML = dots.map(d => {
+      const [px, py] = this.denorm(d.x, d.y);
+      return `<div class="dot${d.old ? ' old' : ''}" style="left:${px}px;top:${py}px"></div>`;
+    }).join('');
+  }
+}
+
+// ---------- Metrics ----------
+function typedOf(ev, upTo = Infinity) {
+  let s = '';
+  for (const e of ev) {
+    if (e[0] > upTo) break;
+    if (e[2] === '<') s = s.slice(0, -1);
+    else if (isLetter(e[2]) || e[2] === ' ') s += e[2];
+  }
+  return s;
+}
+// Levenshtein alignment of target a vs typed b -> ops for a diff view.
+function align(a, b) {
+  const n = a.length, m = b.length, d = [];
+  for (let i = 0; i <= n; i++) { d[i] = [i]; for (let j = 1; j <= m; j++) d[i][j] = i ? 0 : j; }
+  for (let i = 1; i <= n; i++) for (let j = 1; j <= m; j++)
+    d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  const ops = [];
+  let i = n, j = m;
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && d[i][j] === d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)) {
+      ops.push([a[i - 1] === b[j - 1] ? 'ok' : 'bad', b[j - 1]]); i--; j--;
+    } else if (i > 0 && d[i][j] === d[i - 1][j] + 1) { ops.push(['miss', a[i - 1]]); i--; }
+    else { ops.push(['bad', b[j - 1]]); j--; }
+  }
+  return { dist: d[n][m], ops: ops.reverse() };
+}
+function metrics(tr) {
+  const typed = typedOf(tr.ev);
+  const { dist, ops } = align(tr.word, typed);
+  const keys = tr.ev.filter(e => isTyping(e[2]));
+  const first = keys.length ? keys[0][0] : null, last = keys.length ? keys[keys.length - 1][0] : null;
+  const dur = keys.length > 1 ? last - first : 0;
+  return {
+    typed, ops, dist,
+    exact: typed === tr.word,
+    acc: 1 - dist / Math.max(tr.word.length, typed.length, 1),
+    rt: first,
+    wpm: typed.length > 1 && dur > 0 ? (typed.length - 1) / (dur / 1000) * 60 / 5 : null,
+    strokes: keys.length,
+    backspaces: keys.filter(e => e[2] === '<').length,
+    stray: tr.ev.length - keys.length,
+  };
+}
+const mean = a => a.length ? a.reduce((s, v) => s + v, 0) / a.length : null;
+const median = a => { if (!a.length) return null; const s = [...a].sort((x, y) => x - y), h = s.length >> 1; return s.length % 2 ? s[h] : (s[h - 1] + s[h]) / 2; };
+
+// ---------- Encoding (link) ----------
+function b64u(bytes) {
+  let s = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function unb64u(str) {
+  const s = atob(str.replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from(s, c => c.charCodeAt(0));
+}
+async function encode(rec) {
+  const bytes = new TextEncoder().encode(JSON.stringify(rec));
+  if (window.CompressionStream) {
+    try {
+      const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+      return 'z' + b64u(new Uint8Array(await new Response(stream).arrayBuffer()));
+    } catch (_) {}
+  }
+  return 'j' + b64u(bytes);
+}
+async function decode(code) {
+  let bytes = unb64u(code.slice(1));
+  if (code[0] === 'z') {
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+    bytes = new Uint8Array(await new Response(stream).arrayBuffer());
+  }
+  return validate(JSON.parse(new TextDecoder().decode(bytes)));
+}
+// Recordings from links/files are untrusted: rebuild them strictly.
+function validate(o) {
+  if (!o || o.v !== 1 || !Array.isArray(o.trials)) throw new Error('Not a recording');
+  const num = v => Number.isFinite(+v) ? Math.round(+v) : 0;
+  const trials = o.trials.slice(0, 50).map(t => ({
+    word: String(t.word || '').toLowerCase().replace(/[^a-z]/g, '').slice(0, 20),
+    vis: (Array.isArray(t.vis) ? t.vis : []).map(String).filter(isLetter).slice(0, 26),
+    ev: (Array.isArray(t.ev) ? t.ev : []).filter(Array.isArray).slice(0, 1000)
+      .map(e => [num(e[0]), num(e[1]), String(e[2]).slice(0, 8), num(e[3]), num(e[4])])
+      .sort((a, b) => a[0] - b[0]),
+    submit: num(t.submit),
+  }));
+  return { v: 1, kb: SKINS[o.kb] ? o.kb : 'gboard', seed: String(o.seed || '').slice(0, 32), n: trials.length, trials };
+}
+const baseUrl = () => location.href.split('#')[0];
+
+// ---------- UI helpers ----------
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id));
+  shownAt = performance.now();
+}
+// Ignore taps right after a screen change so a stray tap can't hit the new screen's buttons.
+let shownAt = -Infinity;
+document.addEventListener('click', e => {
+  if (performance.now() - shownAt < 400) { e.stopPropagation(); e.preventDefault(); }
+}, true);
+let toastTimer;
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('on'), 1800);
+}
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('dblclick', e => e.preventDefault());
+
+// ---------- Session ----------
+let SKIN = params.get('kb') in SKINS ? params.get('kb') : IS_IOS ? 'ios' : 'gboard';
+const skinReady = detectSkin().then(s => { SKIN = s; });
+const S = { rec: null, words: [], vis: [], i: 0, t0: 0, ev: [], kb: null, link: null, live: false };
+
+function goFullscreen() {
+  const d = document.documentElement, req = d.requestFullscreen || d.webkitRequestFullscreen;
+  if (!req || document.fullscreenElement || document.webkitFullscreenElement) return;
+  try {
+    const p = req.call(d, { navigationUI: 'hide' });
+    if (p && p.then) p.then(() => screen.orientation && screen.orientation.lock && screen.orientation.lock('portrait').catch(() => {}), () => {});
+  } catch (_) {}
+}
+
+async function startSession() {
+  goFullscreen();
+  await skinReady;
+  const seed = params.get('seed') || Math.random().toString(36).slice(2, 8);
+  const r = rng(seed);
+  S.words = shuffle([...WORDS], r).slice(0, N);
+  // Labels: the word's first letter + 2 random letters that are not in the word.
+  S.vis = S.words.map(w => [w[0], ...shuffle([...LETTERS].filter(c => !w.includes(c)), r).slice(0, 2)]);
+  S.rec = { v: 1, kb: SKIN, seed, n: S.words.length, trials: [] };
+  S.i = 0;
+  S.live = true;
+  show('s-trial');
+  if (!S.kb || S.kb.skin !== SKIN) S.kb = new Keyboard($('#t-kb'), SKIN, { onPress });
+  nextTrial();
+}
+
+function nextTrial() {
+  const kb = S.kb;
+  kb.enabled = false;
+  kb.cancelAll();
+  $('#t-word').textContent = '';
+  if (S.i >= S.words.length) return finish();
+  $('#t-prog').textContent = `Word ${S.i + 1} of ${S.words.length}`;
+  kb.setLabels(new Set(S.vis[S.i]));
+  setTimeout(() => {
+    $('#t-word').textContent = S.words[S.i];
+    // Start the clock once the word has actually been painted.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      S.t0 = performance.now();
+      S.ev = [];
+      kb.enabled = true;
+    }));
+  }, S.i === 0 ? 400 : 700);
+}
+
+function onPress(p) {
+  const t = Math.round(p.t - S.t0);
+  if (p.k === 'enter') {
+    S.rec.trials.push({ word: S.words[S.i], vis: S.vis[S.i], ev: S.ev.sort((a, b) => a[0] - b[0]), submit: t });
+    S.i++;
+    nextTrial();
+    return;
+  }
+  S.ev.push([t, Math.round(p.hold), p.k, p.x, p.y]);
+}
+
+function finish() {
+  history.replaceState(null, '', baseUrl());
+  showResult(S.rec, true);
+}
+
+// ---------- Result ----------
+const pct = v => v == null ? '–' : Math.round(v * 100) + '%';
+const fmt = (v, d = 0) => v == null ? '–' : v.toFixed(d);
+
+function showResult(rec, live) {
+  S.rec = rec;
+  S.live = live;
+  const ms = rec.trials.map(metrics);
+  const sum = {
+    exact: ms.filter(m => m.exact).length,
+    acc: mean(ms.map(m => m.acc)),
+    wpm: mean(ms.map(m => m.wpm).filter(v => v != null)),
+    rt: median(ms.map(m => m.rt).filter(v => v != null)),
+  };
+  $('#r-title').textContent = live ? 'Your results' : 'Recording';
+  $('#r-tiles').innerHTML = [
+    [`${sum.exact}/${rec.trials.length}`, 'words exactly right'],
+    [pct(sum.acc), 'mean accuracy'],
+    [fmt(sum.wpm), 'mean words per minute'],
+    [sum.rt == null ? '–' : `${Math.round(sum.rt)} ms`, 'median time to first key'],
+  ].map(([b, s]) => `<div class="tile"><b>${esc(b)}</b><span>${s}</span></div>`).join('');
+  $('#r-rows').innerHTML = rec.trials.map((tr, i) => {
+    const m = ms[i];
+    const typed = m.ops.map(([c, ch]) => `<span class="${c}">${ch === ' ' ? '␣' : c === 'miss' ? '_' : esc(ch)}</span>`).join('') || '<span class="miss">(nothing)</span>';
+    return `<div class="row">
+      <div class="t"><span class="target">${esc(tr.word)}</span><span class="badge${m.exact ? ' good' : ''}">${m.exact ? 'exact' : pct(m.acc)}</span></div>
+      <div class="typed">${typed}</div>
+      <div class="stats">${fmt(m.wpm)} wpm · first key ${m.rt == null ? '–' : m.rt + ' ms'} · ${m.strokes} keys${m.backspaces ? ` (${m.backspaces} ⌫)` : ''}${m.stray ? ` · ${m.stray} other` : ''}</div>
+    </div>`;
+  }).join('');
+  $('#btn-again').textContent = live ? 'Play again' : 'Take the test';
+  $('#btn-copy').disabled = true;
+  S.link = null;
+  show('s-result');
+  $('#s-result').scrollTop = 0;
+  encode(rec).then(code => {
+    S.link = baseUrl() + '#r=' + code;
+    history.replaceState(null, '', '#r=' + code);
+    $('#btn-copy').disabled = false;
+  });
+}
+
+function fileFor(rec) {
+  const json = JSON.stringify(rec);
+  const name = `typing-${rec.seed || 'rec'}-${rec.n}`;
+  return {
+    json, name,
+    // Chrome's Web Share only allows certain extensions (.json isn't one), so fall back to .txt.
+    candidates: [new File([json], name + '.json', { type: 'application/json' }), new File([json], name + '.txt', { type: 'text/plain' })],
+  };
+}
+function download(json, name) {
+  const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+  const a = Object.assign(document.createElement('a'), { href: url, download: name + '.json' });
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+$('#btn-share').onclick = async () => {
+  const { json, name, candidates } = fileFor(S.rec);
+  const file = navigator.canShare && candidates.find(f => navigator.canShare({ files: [f] }));
+  if (file) {
+    try { await navigator.share({ files: [file], title: 'Typing test recording' }); }
+    catch (e) { if (e.name !== 'AbortError') { download(json, name); toast('Saved as file'); } }
+    return;
+  }
+  download(json, name);
+  toast('Saved as file');
+};
+$('#btn-copy').onclick = async () => {
+  if (!S.link) return;
+  try { await navigator.clipboard.writeText(S.link); toast('Link copied'); }
+  catch (_) {
+    const ta = Object.assign(document.createElement('textarea'), { value: S.link });
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;opacity:0';
+    document.body.appendChild(ta);
+    ta.select();
+    ta.setSelectionRange(0, ta.value.length);
+    const ok = document.execCommand('copy');
+    ta.remove();
+    toast(ok ? 'Link copied' : 'Could not copy link');
+  }
+};
+$('#btn-again').onclick = () => {
+  history.replaceState(null, '', baseUrl());
+  if (S.live) startSession();
+  else show('s-intro');
+};
+$('#btn-replay').onclick = () => Replay.open(S.rec);
+
+// ---------- Replay ----------
+const Replay = {
+  rec: null, kb: null, i: 0, t: 0, playing: false, speed: 1, last: 0, raf: 0,
+  open(rec) {
+    this.rec = rec;
+    show('s-replay');
+    if (!this.kb || this.kb.skin !== rec.kb) this.kb = new Keyboard($('#rp-kb'), rec.kb);
+    this.kb.layout();
+    this.kb.setLabels(null); // all labels visible in replay
+    this.select(0);
+    this.play();
+  },
+  end() { return this.rec.trials[this.i].submit + 500; },
+  select(i) {
+    this.i = Math.max(0, Math.min(this.rec.trials.length - 1, i));
+    this.t = -300;
+    $('#rp-target').textContent = `Word ${this.i + 1} of ${this.rec.trials.length}: ${this.rec.trials[this.i].word}`;
+    $('#rp-scrub').max = this.end();
+    this.render();
+  },
+  play() {
+    if (this.t >= this.end()) this.t = -300;
+    this.playing = true;
+    $('#rp-play').textContent = '❚❚';
+    this.last = performance.now();
+    cancelAnimationFrame(this.raf);
+    this.raf = requestAnimationFrame(n => this.tick(n));
+  },
+  pause() {
+    this.playing = false;
+    $('#rp-play').textContent = '▶';
+    cancelAnimationFrame(this.raf);
+  },
+  tick(now) {
+    if (!this.playing) return;
+    this.t += (now - this.last) * this.speed;
+    this.last = now;
+    if (this.t >= this.end()) {
+      if (this.i < this.rec.trials.length - 1) { this.select(this.i + 1); this.t = -600; }
+      else { this.t = this.end(); this.render(); return this.pause(); }
+    }
+    this.render();
+    this.raf = requestAnimationFrame(n => this.tick(n));
+  },
+  render() {
+    const tr = this.rec.trials[this.i], t = this.t;
+    $('#rp-typed').textContent = typedOf(tr.ev, t).replace(/ /g, '␣');
+    $('#rp-time').textContent = (Math.max(0, Math.min(t, tr.submit)) / 1000).toFixed(2) + ' s';
+    $('#rp-pos').textContent = `${this.i + 1}/${this.rec.trials.length}`;
+    $('#rp-scrub').value = Math.max(0, t);
+    const down = new Set(tr.ev.filter(e => t >= e[0] && t < e[0] + Math.max(e[1], 60)).map(e => e[2]));
+    if (t >= tr.submit && t < tr.submit + 150) down.add('enter');
+    this.kb.showDown(down);
+    this.kb.showDots(tr.ev.filter(e => e[0] <= t).map(e => ({ x: e[3], y: e[4], old: t > e[0] + Math.max(e[1], 60) + 250 })));
+  },
+};
+$('#rp-play').onclick = () => Replay.playing ? Replay.pause() : Replay.play();
+$('#rp-prev').onclick = () => { Replay.select(Replay.i - 1); if (Replay.playing) Replay.play(); };
+$('#rp-next').onclick = () => { Replay.select(Replay.i + 1); if (Replay.playing) Replay.play(); };
+$('#rp-scrub').oninput = e => { Replay.pause(); Replay.t = +e.target.value; Replay.render(); };
+$('#rp-speed').onclick = () => {
+  Replay.speed = Replay.speed === 1 ? 2 : Replay.speed === 2 ? 0.5 : 1;
+  $('#rp-speed').textContent = Replay.speed + '×';
+};
+$('#rp-back').onclick = () => { Replay.pause(); show('s-result'); };
+
+// ---------- Intro / loading ----------
+$('#n-words').textContent = N;
+if (IS_IOS && !navigator.standalone) $('#ios-hint').hidden = false;
+$('#btn-start').onclick = startSession;
+$('#btn-load').onclick = () => $('#file').click();
+$('#file').onchange = async e => {
+  const f = e.target.files[0];
+  e.target.value = '';
+  if (!f) return;
+  try { showResult(validate(JSON.parse(await f.text())), false); }
+  catch (_) { toast('That file is not a valid recording'); }
+};
+
+// Manifest so "Add to Home Screen" opens full screen on Android.
+try {
+  const manifest = {
+    name: 'Muscle-Memory Typing Test', short_name: 'Typing Test', display: 'fullscreen', orientation: 'portrait',
+    start_url: baseUrl(), background_color: '#f6f6f3', theme_color: '#f6f6f3',
+  };
+  const link = Object.assign(document.createElement('link'), {
+    rel: 'manifest', href: 'data:application/manifest+json,' + encodeURIComponent(JSON.stringify(manifest)),
+  });
+  document.head.appendChild(link);
+} catch (_) {}
+
+// Router: #r=<recording> opens straight into results.
+(async () => {
+  const m = location.hash.match(/^#r=([A-Za-z0-9_-]+)$/);
+  if (!m) return;
+  try { showResult(await decode(m[1]), false); }
+  catch (_) { toast('This link has an invalid recording'); history.replaceState(null, '', baseUrl()); }
+})();
+</script>
+</body>
+</html>
