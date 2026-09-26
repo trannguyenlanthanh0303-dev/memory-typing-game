@@ -1,0 +1,11 @@
+{
+  "name": "memory-typing-game-tests",
+  "private": true,
+  "scripts": {
+    "e2e": "node e2e.js",
+    "hardening": "node hardening.js"
+  },
+  "devDependencies": {
+    "playwright-core": "^1"
+  }
+}
