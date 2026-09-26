@@ -1,4 +1,4 @@
-# Muscle-Memory Typing Test
+# Memory Typing Game
 
 A single static `index.html` with no dependencies and no backend. Participants type common words on an on-screen keyboard that copies their phone's own keyboard, with about 75% of the letter labels hidden (7 of 26 shown). Every tap is recorded so the session can be replayed and analyzed.
 

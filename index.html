@@ -2,12 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Muscle-Memory Typing Test</title>
+<title>Memory Typing Game</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Typing Test">
+<meta name="apple-mobile-web-app-title" content="Typing Game">
 <meta name="format-detection" content="telephone=no">
 <meta name="theme-color" content="#f6f6f3" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#121214" media="(prefers-color-scheme: dark)">
@@ -158,7 +158,7 @@ ol.steps li::before {
 
 <section id="s-intro" class="screen scroll on">
   <div class="page">
-    <h1>Muscle-Memory Typing Test</h1>
+    <h1>Memory Typing Game</h1>
     <p class="lede">How well do your thumbs know the keyboard?</p>
 
     <h2>Why this test</h2>
@@ -948,7 +948,7 @@ $('#file').onchange = async e => {
 // Manifest so "Add to Home Screen" opens full screen on Android.
 try {
   const manifest = {
-    name: 'Muscle-Memory Typing Test', short_name: 'Typing Test', display: 'fullscreen', orientation: 'portrait',
+    name: 'Memory Typing Game', short_name: 'Typing Game', display: 'fullscreen', orientation: 'portrait',
     start_url: baseUrl(), background_color: '#f6f6f3', theme_color: '#f6f6f3',
   };
   const link = Object.assign(document.createElement('link'), {
