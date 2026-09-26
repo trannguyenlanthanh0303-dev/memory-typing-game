@@ -253,7 +253,7 @@ const HAS_NOTCH = IS_IOS && Math.max(screen.width, screen.height) / Math.min(scr
 
 function detectSkin() {
   const forced = params.get('kb');
-  if (SKINS[forced]) return Promise.resolve(forced);
+  if (isSkin(forced)) return Promise.resolve(forced);
   if (IS_IOS) return Promise.resolve('ios');
   if (!/Android/.test(UA)) return Promise.resolve('gboard');
   if (/SM-|Samsung/i.test(UA)) return Promise.resolve('samsung');
@@ -315,6 +315,8 @@ const SKINS = {
     return { toolbar: 44, areaH: 214, strip: 0, keys };
   },
 };
+// Own keys only, so untrusted names like "constructor" aren't treated as skins.
+function isSkin(name) { return typeof name === 'string' && Object.prototype.hasOwnProperty.call(SKINS, name); }
 
 const ICONS = {
   shift: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 4l8 8.5h-4.5V19h-7v-6.5H4z"/></svg>',
@@ -358,8 +360,9 @@ class Keyboard {
 
     host.replaceChildren(el);
     this.layout();
-    if (window.ResizeObserver) new ResizeObserver(() => this.layout()).observe(el);
-    else addEventListener('resize', () => this.layout());
+    this.onResize = () => this.layout();
+    if (window.ResizeObserver) (this.ro = new ResizeObserver(this.onResize)).observe(el);
+    else addEventListener('resize', this.onResize);
     if (opts.onPress) this.bind();
   }
 
@@ -427,6 +430,12 @@ class Keyboard {
     for (const t of ['touchstart', 'touchend']) el.addEventListener(t, e => e.preventDefault(), { passive: false });
   }
 
+  destroy() {
+    if (this.ro) this.ro.disconnect();
+    else removeEventListener('resize', this.onResize);
+    this.el.remove();
+  }
+
   cancelAll() {
     for (const a of this.active.values()) a.key.el.classList.remove('down');
     this.active.clear();
@@ -455,7 +464,8 @@ function typedOf(ev, upTo = Infinity) {
 // Levenshtein alignment of target a vs typed b -> ops for a diff view.
 function align(a, b) {
   const n = a.length, m = b.length, d = [];
-  for (let i = 0; i <= n; i++) { d[i] = [i]; for (let j = 1; j <= m; j++) d[i][j] = i ? 0 : j; }
+  for (let i = 0; i <= n; i++) d[i] = [i];
+  for (let j = 1; j <= m; j++) d[0][j] = j;
   for (let i = 1; i <= n; i++) for (let j = 1; j <= m; j++)
     d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
   const ops = [];
@@ -508,11 +518,25 @@ async function encode(rec) {
   }
   return 'j' + b64u(bytes);
 }
+const MAX_REC_BYTES = 1 << 20; // far above any real recording; guards against decompression bombs
 async function decode(code) {
   let bytes = unb64u(code.slice(1));
   if (code[0] === 'z') {
-    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
-    bytes = new Uint8Array(await new Response(stream).arrayBuffer());
+    if (!window.DecompressionStream) throw new Error('unsupported');
+    // Read in chunks and stop at the cap instead of inflating everything into memory.
+    const reader = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader();
+    const chunks = [];
+    let size = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.length;
+      if (size > MAX_REC_BYTES) { reader.cancel(); throw new Error('Recording too large'); }
+      chunks.push(value);
+    }
+    bytes = new Uint8Array(size);
+    let off = 0;
+    for (const c of chunks) { bytes.set(c, off); off += c.length; }
   }
   return validate(JSON.parse(new TextDecoder().decode(bytes)));
 }
@@ -520,7 +544,7 @@ async function decode(code) {
 function validate(o) {
   if (!o || o.v !== 1 || !Array.isArray(o.trials)) throw new Error('Not a recording');
   const num = v => Number.isFinite(+v) ? Math.round(+v) : 0;
-  const trials = o.trials.slice(0, 50).map(t => ({
+  const trials = o.trials.filter(t => t && typeof t === 'object').slice(0, 50).map(t => ({
     word: String(t.word || '').toLowerCase().replace(/[^a-z]/g, '').slice(0, 20),
     vis: (Array.isArray(t.vis) ? t.vis : []).map(String).filter(isLetter).slice(0, 26),
     ev: (Array.isArray(t.ev) ? t.ev : []).filter(Array.isArray).slice(0, 1000)
@@ -528,7 +552,8 @@ function validate(o) {
       .sort((a, b) => a[0] - b[0]),
     submit: num(t.submit),
   }));
-  return { v: 1, kb: SKINS[o.kb] ? o.kb : 'gboard', seed: String(o.seed || '').slice(0, 32), n: trials.length, trials };
+  if (!trials.length) throw new Error('Recording has no words');
+  return { v: 1, kb: isSkin(o.kb) ? o.kb : 'gboard', seed: String(o.seed || '').slice(0, 32), n: trials.length, trials };
 }
 const baseUrl = () => location.href.split('#')[0];
 
@@ -554,7 +579,7 @@ document.addEventListener('gesturestart', e => e.preventDefault());
 document.addEventListener('dblclick', e => e.preventDefault());
 
 // ---------- Session ----------
-let SKIN = params.get('kb') in SKINS ? params.get('kb') : IS_IOS ? 'ios' : 'gboard';
+let SKIN = isSkin(params.get('kb')) ? params.get('kb') : IS_IOS ? 'ios' : 'gboard';
 const skinReady = detectSkin().then(s => { SKIN = s; });
 const S = { rec: null, words: [], vis: [], i: 0, t0: 0, ev: [], kb: null, link: null, live: false };
 
@@ -579,7 +604,10 @@ async function startSession() {
   S.i = 0;
   S.live = true;
   show('s-trial');
-  if (!S.kb || S.kb.skin !== SKIN) S.kb = new Keyboard($('#t-kb'), SKIN, { onPress });
+  if (!S.kb || S.kb.skin !== SKIN) {
+    if (S.kb) S.kb.destroy();
+    S.kb = new Keyboard($('#t-kb'), SKIN, { onPress });
+  }
   nextTrial();
 }
 
@@ -716,7 +744,10 @@ const Replay = {
   open(rec) {
     this.rec = rec;
     show('s-replay');
-    if (!this.kb || this.kb.skin !== rec.kb) this.kb = new Keyboard($('#rp-kb'), rec.kb);
+    if (!this.kb || this.kb.skin !== rec.kb) {
+      if (this.kb) this.kb.destroy();
+      this.kb = new Keyboard($('#rp-kb'), rec.kb);
+    }
     this.kb.layout();
     this.kb.setLabels(null); // all labels visible in replay
     this.select(0);
@@ -803,10 +834,15 @@ try {
 
 // Router: #r=<recording> opens straight into results.
 (async () => {
-  const m = location.hash.match(/^#r=([A-Za-z0-9_-]+)$/);
+  const m = location.hash.match(/^#r=([A-Za-z0-9_-]{1,100000})$/);
   if (!m) return;
   try { showResult(await decode(m[1]), false); }
-  catch (_) { toast('This link has an invalid recording'); history.replaceState(null, '', baseUrl()); }
+  catch (e) {
+    // Keep the link in the address bar if it's valid but this browser can't unpack it.
+    if (e.message === 'unsupported') return toast('This browser can’t open this link. Try another browser or ask for the file.');
+    toast('This link has an invalid recording');
+    history.replaceState(null, '', baseUrl());
+  }
 })();
 </script>
 </body>
