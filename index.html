@@ -80,6 +80,23 @@ ol.steps li::before {
 .ok { color: var(--good); } .bad { color: var(--bad); text-decoration: underline; text-decoration-thickness: 2px; } .miss { color: var(--miss); }
 .badge { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 99px; background: var(--line); }
 .badge.good { background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--good); }
+.pline { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.pline .typed { flex: 1; min-width: 0; }
+.ptag { flex: none; width: 24px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.row.multi .stats { padding-left: 32px; }
+.cmp { display: grid; grid-template-columns: 1.1fr 1fr 1fr; background: var(--card); border: 1px solid var(--line); border-radius: 14px; margin: 16px 0 4px; overflow: hidden; }
+.cmp > div { padding: 10px 12px; border-top: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.cmp > .h { border-top: 0; font-size: 12px; font-weight: 600; color: var(--muted); line-height: 1.3; }
+.cmp > .l { font-size: 14px; color: var(--muted); }
+.cmp > .v { font-size: 20px; font-weight: 700; }
+.tiles.three { grid-template-columns: repeat(3, 1fr); }
+.tiles.three .tile b { font-size: 22px; }
+
+/* Pass screens */
+.page.center { margin: auto; }
+.step { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 6px; font-weight: 600; }
+.grip { font-size: 18px; font-weight: 600; }
+#btn-pass { margin-top: 24px; }
 
 /* Replay */
 .rp-top { display: flex; align-items: center; justify-content: space-between; padding: calc(8px + var(--safe-t)) 8px 0; }
@@ -113,6 +130,7 @@ ol.steps li::before {
 .kb .dots { position: absolute; inset: 0; pointer-events: none; }
 .kb .dot { position: absolute; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; background: #ff3b30; border: 2px solid #fff; }
 .kb .dot.old { width: 8px; height: 8px; margin: -4px 0 0 -4px; border: 0; opacity: .45; }
+.kb .dot.blocked { background: none; border: 2px dashed #8e8e93; }
 
 .kb[data-skin=ios] {
   --kb-bg: #d1d4da; --kb-key: #fff; --kb-sp: #abb0bb; --kb-fg: #000; --kb-fg2: #000; --kb-down: #d9dbe0;
@@ -149,13 +167,13 @@ ol.steps li::before {
 
     <h2>How it works</h2>
     <ol class="steps">
-      <li>Hold your phone the way you normally do when texting (one thumb, two thumbs, whatever feels natural).</li>
-      <li>Tap <b>Start</b>. A word appears at the top of the screen.</li>
+      <li>The test has <b>2 passes</b> of <b id="n-words">5</b> words each. In <b>pass 1</b> you hold your phone however is most comfortable. In <b>pass 2</b> you type with only the <b>thumb of your non-dominant hand</b>. Each pass starts with a short instruction.</li>
+      <li>Tap <b>Start</b>. When a pass begins, a word appears at the top of the screen.</li>
       <li>Type the word on the keyboard below. Most key labels are blank. Only the word's <b>first letter</b> and a few random keys are labelled.</li>
       <li>What you type is <b>hidden</b>, so don't look for it. Keep going as you would normally.</li>
       <li>If you <em>feel</em> you made a mistake, you can fix it with <b>⌫</b>. When you think the word is done, tap <b>Submit</b>.</li>
-      <li>Repeat this for <b id="n-words">5</b> words.</li>
-      <li>Check your results, then tap <b>Share</b> to send your recording to the researcher.</li>
+      <li>After pass 1 you'll see a quick summary. Pass 2 uses the same words in a new order.</li>
+      <li>At the end, see how the two passes compare, then tap <b>Share</b> to send your recording to the researcher.</li>
     </ol>
     <p class="note">Type as naturally and quickly as you would in a message. Don't aim for perfection: mistakes are part of what's being measured. No personal or device information is collected, only the words and your taps.</p>
     <p class="note" id="ios-hint" hidden>For a true full-screen view on iPhone, tap <b>Share → Add to Home Screen</b> and open the test from your home screen.</p>
@@ -165,6 +183,15 @@ ol.steps li::before {
       <button class="linkbtn" id="btn-load">Load a recording (.json)</button>
       <input type="file" id="file" accept=".json,.txt,application/json,text/plain" hidden>
     </div>
+  </div>
+</section>
+
+<section id="s-pass" class="screen scroll">
+  <div class="page center">
+    <p class="step" id="p-step"></p>
+    <h1 id="p-title"></h1>
+    <div id="p-body"></div>
+    <button class="btn" id="btn-pass"></button>
   </div>
 </section>
 
@@ -223,6 +250,22 @@ const WORDS = [
   'love', 'good', 'know', 'home', 'time', 'later', 'sorry', 'happy', 'today', 'night',
   'thanks', 'really', 'people', 'should', 'because', 'tonight', 'morning', 'tomorrow', 'probably', 'something',
 ];
+// The two passes, as in the Finger Reach Test. `grip` is saved in the recording.
+const PASSES = [
+  {
+    grip: 'comfortable', title: 'Your most comfortable grip', short: 'Comfortable grip',
+    how: 'Hold your phone however is most comfortable: one hand or two, any fingers or thumbs.',
+    task: 'Type each word the way you normally would when texting.',
+    hint: 'Type it from memory, then tap Submit', maxTouches: Infinity,
+  },
+  {
+    grip: 'nondominant-thumb', title: 'Non-dominant hand, thumb only', short: 'Non-dominant thumb',
+    how: 'Now hold your phone in one hand only: your non-dominant one (your left hand if you\'re right-handed).',
+    task: 'Type using only the thumb of that hand. Only one touch counts at a time.',
+    hint: 'Non-dominant thumb only, then tap Submit', maxTouches: 1,
+  },
+];
+const gripName = g => (PASSES.find(P => P.grip === g) || { short: 'Single pass' }).short;
 const VISIBLE_LABELS = 7; // of 26 letters, i.e. ~75% hidden: the word's first letter + 6 random others
 const LETTERS = 'abcdefghijklmnopqrstuvwxyz';
 const params = new URLSearchParams(location.search);
@@ -334,6 +377,7 @@ class Keyboard {
     this.skin = skin;
     this.opts = opts;
     this.enabled = false;
+    this.maxTouches = Infinity; // 1 = single finger: extra touches are reported to onBlocked, not typed
     this.active = new Map();
     const s = this.s = SKINS[skin](skin === 'ios' && HAS_NOTCH);
     const el = this.el = document.createElement('div');
@@ -412,8 +456,12 @@ class Keyboard {
       const r = el.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
       const key = this.hit(px, py);
       if (!key) return;
-      try { el.setPointerCapture(e.pointerId); } catch (_) {}
       const [nx, ny] = this.norm(px, py);
+      if (this.active.size >= this.maxTouches) {
+        if (this.opts.onBlocked) this.opts.onBlocked({ k: key.k, t: now(e), x: nx, y: ny });
+        return;
+      }
+      try { el.setPointerCapture(e.pointerId); } catch (_) {}
       this.active.set(e.pointerId, { key, t: now(e), nx, ny });
       key.el.classList.add('down');
     });
@@ -447,7 +495,7 @@ class Keyboard {
   showDots(dots) { // [{x, y, old}]
     this.dotLayer.innerHTML = dots.map(d => {
       const [px, py] = this.denorm(d.x, d.y);
-      return `<div class="dot${d.old ? ' old' : ''}" style="left:${px}px;top:${py}px"></div>`;
+      return `<div class="dot${d.blocked ? ' blocked' : d.old ? ' old' : ''}" style="left:${px}px;top:${py}px"></div>`;
     }).join('');
   }
 }
@@ -494,6 +542,17 @@ function metrics(tr) {
     strokes: keys.length,
     backspaces: keys.filter(e => e[2] === '<').length,
     stray: tr.ev.length - keys.length,
+    blocked: tr.blocked ? tr.blocked.length : 0,
+  };
+}
+function summarize(trials) {
+  const ms = trials.map(metrics);
+  return {
+    n: trials.length,
+    exact: ms.filter(m => m.exact).length,
+    acc: mean(ms.map(m => m.acc)),
+    wpm: mean(ms.map(m => m.wpm).filter(v => v != null)),
+    rt: median(ms.map(m => m.rt).filter(v => v != null)),
   };
 }
 const mean = a => a.length ? a.reduce((s, v) => s + v, 0) / a.length : null;
@@ -542,19 +601,32 @@ async function decode(code) {
   return validate(JSON.parse(new TextDecoder().decode(bytes)));
 }
 // Recordings from links/files are untrusted: rebuild them strictly.
+// v1 (single pass, top-level `trials`) is upgraded to the v2 shape with one pass.
 function validate(o) {
-  if (!o || o.v !== 1 || !Array.isArray(o.trials)) throw new Error('Not a recording');
+  if (!o || typeof o !== 'object') throw new Error('Not a recording');
   const num = v => Number.isFinite(+v) ? Math.round(+v) : 0;
-  const trials = o.trials.filter(t => t && typeof t === 'object').slice(0, 50).map(t => ({
-    word: String(t.word || '').toLowerCase().replace(/[^a-z]/g, '').slice(0, 20),
-    vis: (Array.isArray(t.vis) ? t.vis : []).map(String).filter(isLetter).slice(0, 26),
-    ev: (Array.isArray(t.ev) ? t.ev : []).filter(Array.isArray).slice(0, 1000)
-      .map(e => [num(e[0]), num(e[1]), String(e[2]).slice(0, 8), num(e[3]), num(e[4])])
-      .sort((a, b) => a[0] - b[0]),
-    submit: num(t.submit),
-  }));
-  if (!trials.length) throw new Error('Recording has no words');
-  return { v: 1, kb: isSkin(o.kb) ? o.kb : 'gboard', seed: String(o.seed || '').slice(0, 32), n: trials.length, trials };
+  const list = a => Array.isArray(a) ? a : [];
+  const trialsOf = arr => list(arr).filter(t => t && typeof t === 'object').slice(0, 50).map(t => {
+    const tr = {
+      word: String(t.word || '').toLowerCase().replace(/[^a-z]/g, '').slice(0, 20),
+      vis: list(t.vis).map(String).filter(isLetter).slice(0, 26),
+      ev: list(t.ev).filter(Array.isArray).slice(0, 1000)
+        .map(e => [num(e[0]), num(e[1]), String(e[2]).slice(0, 8), num(e[3]), num(e[4])])
+        .sort((a, b) => a[0] - b[0]),
+      submit: num(t.submit),
+    };
+    const blocked = list(t.blocked).filter(Array.isArray).slice(0, 1000).map(b => [num(b[0]), String(b[1]).slice(0, 8), num(b[2]), num(b[3])]);
+    if (blocked.length) tr.blocked = blocked;
+    return tr;
+  });
+  let passes;
+  if (o.v === 1) passes = [{ grip: null, trials: trialsOf(o.trials) }];
+  else if (o.v === 2) passes = list(o.passes).filter(p => p && typeof p === 'object').slice(0, 4)
+    .map(p => ({ grip: PASSES.some(P => P.grip === p.grip) ? p.grip : null, trials: trialsOf(p.trials) }));
+  else throw new Error('Not a recording');
+  passes = passes.filter(p => p.trials.length);
+  if (!passes.length) throw new Error('Recording has no words');
+  return { v: 2, kb: isSkin(o.kb) ? o.kb : 'gboard', seed: String(o.seed || '').slice(0, 32), n: passes[0].trials.length, passes };
 }
 const baseUrl = () => location.href.split('#')[0];
 
@@ -582,7 +654,7 @@ document.addEventListener('dblclick', e => e.preventDefault());
 // ---------- Session ----------
 let SKIN = isSkin(params.get('kb')) ? params.get('kb') : IS_IOS ? 'ios' : 'gboard';
 const skinReady = detectSkin().then(s => { SKIN = s; });
-const S = { rec: null, words: [], vis: [], i: 0, t0: 0, ev: [], kb: null, link: null, live: false };
+const S = { rec: null, plan: [], p: 0, i: 0, t0: 0, ev: [], blocked: [], kb: null, link: null, live: false };
 
 function goFullscreen() {
   const d = document.documentElement, req = d.requestFullscreen || d.webkitRequestFullscreen;
@@ -598,34 +670,69 @@ async function startSession() {
   await skinReady;
   const seed = params.get('seed') || Math.random().toString(36).slice(2, 8);
   const r = rng(seed);
-  S.words = shuffle([...WORDS], r).slice(0, N);
-  // Labels: the word's first letter + random letters that are not in the word.
-  S.vis = S.words.map(w => [w[0], ...shuffle([...LETTERS].filter(c => !w.includes(c)), r).slice(0, VISIBLE_LABELS - 1)]);
-  S.rec = { v: 1, kb: SKIN, seed, n: S.words.length, trials: [] };
-  S.i = 0;
+  const words = shuffle([...WORDS], r).slice(0, N);
+  // Pass 2 reuses pass 1's words in a new order. Labels are re-drawn per pass:
+  // the word's first letter + random letters that are not in the word.
+  S.plan = PASSES.map((P, pi) => {
+    const ws = pi ? shuffle([...words], r) : words;
+    return { words: ws, vis: ws.map(w => [w[0], ...shuffle([...LETTERS].filter(c => !w.includes(c)), r).slice(0, VISIBLE_LABELS - 1)]) };
+  });
+  S.rec = { v: 2, kb: SKIN, seed, n: words.length, passes: PASSES.map(P => ({ grip: P.grip, trials: [] })) };
+  S.p = 0;
   S.live = true;
+  showPassIntro();
+}
+
+function showPassIntro() {
+  const P = PASSES[S.p];
+  $('#p-step').textContent = `Pass ${S.p + 1} of ${PASSES.length}`;
+  $('#p-title').textContent = P.title;
+  $('#p-body').innerHTML = `<p class="grip">${esc(P.how)}</p><p>${esc(P.task)}</p>`;
+  $('#btn-pass').textContent = `Begin pass ${S.p + 1}`;
+  $('#btn-pass').onclick = beginPass;
+  show('s-pass');
+}
+
+function showPassSummary() {
+  const sum = summarize(S.rec.passes[S.p].trials);
+  $('#p-step').textContent = `Pass ${S.p + 1} of ${PASSES.length} · done`;
+  $('#p-title').textContent = `Pass ${S.p + 1} complete`;
+  $('#p-body').innerHTML = `<div class="tiles three">${[
+    [`${sum.exact}/${sum.n}`, 'exactly right'], [pct(sum.acc), 'accuracy'], [fmt(sum.wpm), 'words / min'],
+  ].map(([b, t]) => `<div class="tile"><b>${esc(b)}</b><span>${t}</span></div>`).join('')}</div>
+    <p style="margin-top:16px">Next: the same words in a new order, typed with a different grip.</p>`;
+  $('#btn-pass').textContent = `Continue to pass ${S.p + 2} →`;
+  $('#btn-pass').onclick = () => { S.p++; showPassIntro(); };
+  show('s-pass');
+}
+
+function beginPass() {
+  S.i = 0;
   show('s-trial');
   if (!S.kb || S.kb.skin !== SKIN) {
     if (S.kb) S.kb.destroy();
-    S.kb = new Keyboard($('#t-kb'), SKIN, { onPress });
+    S.kb = new Keyboard($('#t-kb'), SKIN, { onPress, onBlocked });
   }
+  S.kb.maxTouches = PASSES[S.p].maxTouches;
+  $('#t-hint').textContent = PASSES[S.p].hint;
   nextTrial();
 }
 
 function nextTrial() {
-  const kb = S.kb;
+  const kb = S.kb, plan = S.plan[S.p];
   kb.enabled = false;
   kb.cancelAll();
   $('#t-word').textContent = '';
-  if (S.i >= S.words.length) return finish();
-  $('#t-prog').textContent = `Word ${S.i + 1} of ${S.words.length}`;
-  kb.setLabels(new Set(S.vis[S.i]));
+  if (S.i >= plan.words.length) return S.p < PASSES.length - 1 ? showPassSummary() : finish();
+  $('#t-prog').textContent = `Pass ${S.p + 1} · Word ${S.i + 1} of ${plan.words.length}`;
+  kb.setLabels(new Set(plan.vis[S.i]));
   setTimeout(() => {
-    $('#t-word').textContent = S.words[S.i];
+    $('#t-word').textContent = plan.words[S.i];
     // Start the clock once the word has actually been painted.
     requestAnimationFrame(() => requestAnimationFrame(() => {
       S.t0 = performance.now();
       S.ev = [];
+      S.blocked = [];
       kb.enabled = true;
     }));
   }, S.i === 0 ? 400 : 700);
@@ -634,12 +741,20 @@ function nextTrial() {
 function onPress(p) {
   const t = Math.round(p.t - S.t0);
   if (p.k === 'enter') {
-    S.rec.trials.push({ word: S.words[S.i], vis: S.vis[S.i], ev: S.ev.sort((a, b) => a[0] - b[0]), submit: t });
+    const plan = S.plan[S.p];
+    const tr = { word: plan.words[S.i], vis: plan.vis[S.i], ev: S.ev.sort((a, b) => a[0] - b[0]), submit: t };
+    if (S.blocked.length) tr.blocked = S.blocked;
+    S.rec.passes[S.p].trials.push(tr);
     S.i++;
     nextTrial();
     return;
   }
   S.ev.push([t, Math.round(p.hold), p.k, p.x, p.y]);
+}
+
+// Extra fingers during a one-touch pass: not typed, but kept as evidence.
+function onBlocked(b) {
+  if (S.kb.enabled) S.blocked.push([Math.round(b.t - S.t0), b.k, b.x, b.y]);
 }
 
 function finish() {
@@ -654,28 +769,30 @@ const fmt = (v, d = 0) => v == null ? '–' : v.toFixed(d);
 function showResult(rec, live) {
   S.rec = rec;
   S.live = live;
-  const ms = rec.trials.map(metrics);
-  const sum = {
-    exact: ms.filter(m => m.exact).length,
-    acc: mean(ms.map(m => m.acc)),
-    wpm: mean(ms.map(m => m.wpm).filter(v => v != null)),
-    rt: median(ms.map(m => m.rt).filter(v => v != null)),
-  };
+  const passes = rec.passes, multi = passes.length > 1;
+  const sums = passes.map(p => summarize(p.trials));
   $('#r-title').textContent = live ? 'Your results' : 'Recording';
-  $('#r-tiles').innerHTML = [
-    [`${sum.exact}/${rec.trials.length}`, 'words exactly right'],
-    [pct(sum.acc), 'mean accuracy'],
-    [fmt(sum.wpm), 'mean words per minute'],
-    [sum.rt == null ? '–' : `${Math.round(sum.rt)} ms`, 'median time to first key'],
-  ].map(([b, s]) => `<div class="tile"><b>${esc(b)}</b><span>${s}</span></div>`).join('');
-  $('#r-rows').innerHTML = rec.trials.map((tr, i) => {
-    const m = ms[i];
-    const typed = m.ops.map(([c, ch]) => `<span class="${c}">${ch === ' ' ? '␣' : c === 'miss' ? '_' : esc(ch)}</span>`).join('') || '<span class="miss">(nothing)</span>';
-    return `<div class="row">
-      <div class="t"><span class="target">${esc(tr.word)}</span><span class="badge${m.exact ? ' good' : ''}">${m.exact ? 'exact' : pct(m.acc)}</span></div>
-      <div class="typed">${typed}</div>
-      <div class="stats">${fmt(m.wpm)} wpm · first key ${m.rt == null ? '–' : m.rt + ' ms'} · ${m.strokes} keys${m.backspaces ? ` (${m.backspaces} ⌫)` : ''}${m.stray ? ` · ${m.stray} other` : ''}</div>
-    </div>`;
+  const rows = [
+    ['Exactly right', s => `${s.exact}/${s.n}`],
+    ['Accuracy', s => pct(s.acc)],
+    ['Words / min', s => fmt(s.wpm)],
+    ['First key', s => s.rt == null ? '–' : `${Math.round(s.rt)} ms`],
+  ];
+  $('#r-tiles').outerHTML = multi
+    ? `<div class="cmp" id="r-tiles"><div class="h"></div>${passes.map((p, i) => `<div class="h">Pass ${i + 1}<br>${esc(gripName(p.grip))}</div>`).join('')}
+        ${rows.map(([l, f]) => `<div class="l">${l}</div>${sums.map(s => `<div class="v">${esc(f(s))}</div>`).join('')}`).join('')}</div>`
+    : `<div class="tiles" id="r-tiles">${rows.map(([l, f]) => `<div class="tile"><b>${esc(f(sums[0]))}</b><span>${l.toLowerCase()}</span></div>`).join('')}</div>`;
+  // One card per word, with a line per pass (pass 2 has the same words in another order).
+  $('#r-rows').innerHTML = passes[0].trials.map(tr0 => {
+    const lines = passes.map((p, pi) => {
+      const tr = p.trials.find(t => t.word === tr0.word);
+      if (!tr) return '';
+      const m = metrics(tr);
+      const typed = m.ops.map(([c, ch]) => `<span class="${c}">${ch === ' ' ? '␣' : c === 'miss' ? '_' : esc(ch)}</span>`).join('') || '<span class="miss">(nothing)</span>';
+      return `<div class="pline">${multi ? `<span class="ptag">P${pi + 1}</span>` : ''}<span class="typed">${typed}</span><span class="badge${m.exact ? ' good' : ''}">${m.exact ? 'exact' : pct(m.acc)}</span></div>
+        <div class="stats">${fmt(m.wpm)} wpm · first key ${m.rt == null ? '–' : m.rt + ' ms'} · ${m.strokes} keys${m.backspaces ? ` (${m.backspaces} ⌫)` : ''}${m.stray ? ` · ${m.stray} other` : ''}${m.blocked ? ` · ${m.blocked} blocked` : ''}</div>`;
+    }).join('');
+    return `<div class="row${multi ? ' multi' : ''}"><div class="target">${esc(tr0.word)}</div>${lines}</div>`;
   }).join('');
   $('#btn-again').textContent = live ? 'Play again' : 'Take the test';
   $('#btn-copy').disabled = true;
@@ -741,9 +858,13 @@ $('#btn-replay').onclick = () => Replay.open(S.rec);
 
 // ---------- Replay ----------
 const Replay = {
-  rec: null, kb: null, i: 0, t: 0, playing: false, speed: 1, last: 0, raf: 0,
+  rec: null, items: [], kb: null, i: 0, t: 0, playing: false, speed: 1, last: 0, raf: 0,
   open(rec) {
     this.rec = rec;
+    const multi = rec.passes.length > 1;
+    this.items = rec.passes.flatMap((p, pi) => p.trials.map((t, i) => ({
+      t, label: `${multi ? `Pass ${pi + 1} · ` : ''}Word ${i + 1} of ${p.trials.length}`,
+    })));
     show('s-replay');
     if (!this.kb || this.kb.skin !== rec.kb) {
       if (this.kb) this.kb.destroy();
@@ -754,11 +875,11 @@ const Replay = {
     this.select(0);
     this.play();
   },
-  end() { return this.rec.trials[this.i].submit + 500; },
+  end() { return this.items[this.i].t.submit + 500; },
   select(i) {
-    this.i = Math.max(0, Math.min(this.rec.trials.length - 1, i));
+    this.i = Math.max(0, Math.min(this.items.length - 1, i));
     this.t = -300;
-    $('#rp-target').textContent = `Word ${this.i + 1} of ${this.rec.trials.length}: ${this.rec.trials[this.i].word}`;
+    $('#rp-target').textContent = `${this.items[this.i].label}: ${this.items[this.i].t.word}`;
     $('#rp-scrub').max = this.end();
     this.render();
   },
@@ -780,22 +901,25 @@ const Replay = {
     this.t += (now - this.last) * this.speed;
     this.last = now;
     if (this.t >= this.end()) {
-      if (this.i < this.rec.trials.length - 1) { this.select(this.i + 1); this.t = -600; }
+      if (this.i < this.items.length - 1) { this.select(this.i + 1); this.t = -600; }
       else { this.t = this.end(); this.render(); return this.pause(); }
     }
     this.render();
     this.raf = requestAnimationFrame(n => this.tick(n));
   },
   render() {
-    const tr = this.rec.trials[this.i], t = this.t;
+    const tr = this.items[this.i].t, t = this.t;
     $('#rp-typed').textContent = typedOf(tr.ev, t).replace(/ /g, '␣');
     $('#rp-time').textContent = (Math.max(0, Math.min(t, tr.submit)) / 1000).toFixed(2) + ' s';
-    $('#rp-pos').textContent = `${this.i + 1}/${this.rec.trials.length}`;
+    $('#rp-pos').textContent = `${this.i + 1}/${this.items.length}`;
     $('#rp-scrub').value = Math.max(0, t);
     const down = new Set(tr.ev.filter(e => t >= e[0] && t < e[0] + Math.max(e[1], 60)).map(e => e[2]));
     if (t >= tr.submit && t < tr.submit + 150) down.add('enter');
     this.kb.showDown(down);
-    this.kb.showDots(tr.ev.filter(e => e[0] <= t).map(e => ({ x: e[3], y: e[4], old: t > e[0] + Math.max(e[1], 60) + 250 })));
+    this.kb.showDots([
+      ...tr.ev.filter(e => e[0] <= t).map(e => ({ x: e[3], y: e[4], old: t > e[0] + Math.max(e[1], 60) + 250 })),
+      ...(tr.blocked || []).filter(b => b[0] <= t).map(b => ({ x: b[2], y: b[3], blocked: true })),
+    ]);
   },
 };
 $('#rp-play').onclick = () => Replay.playing ? Replay.pause() : Replay.play();
