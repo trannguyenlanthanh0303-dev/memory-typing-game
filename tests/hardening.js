@@ -38,6 +38,17 @@ const good = { v: 1, kb: 'ios', seed: 's', n: 1, trials: [{ word: 'people', vis:
     showResult(g, false); Replay.open(g); Replay.pause();
     return { oldAttached: old.el.isConnected, kbs: document.querySelectorAll('#rp-kb .kb').length, skin: Replay.kb.skin };
   }, good));
+  // 7. number trials (format v3): v2 without nums loads; junk seq/vis is cleaned; pad keyboards are cleaned up too
+  const v2 = { v: 2, kb: 'samsung', seed: 's', n: 1, passes: [{ grip: 'comfortable', trials: good.trials }] };
+  await run('7 v2 file (no numbers)', base + '#r=' + link(v2), p => p.evaluate(() => ({ v: S.rec.v, d: S.rec.d, nums: S.rec.passes[0].nums.length, numsHidden: $('#r-nums').hidden })));
+  const v3 = { v: 3, kb: 'ios', seed: 's', n: 0, d: 1, passes: [{ grip: 'comfortable', trials: [], nums: [{ seq: '12a3<b>45', vis: ['1', 'x', 7, '99'], ev: [[100, 50, '1', 200, 300]], submit: 400 }] }] };
+  await run('7 v3 numbers only, junk seq/vis', base + '#r=' + link(v3), p => p.evaluate(() => ({ seq: S.rec.passes[0].nums[0].seq, vis: S.rec.passes[0].nums[0].vis, rows: document.querySelectorAll('#r-nrows .row').length, wordRows: document.querySelectorAll('#r-rows .row').length })));
+  await run('7 replay pads cleaned up on skin change', base, async p => p.evaluate(async r => {
+    const a = validate(r), g = validate({ ...r, kb: 'gboard' });
+    showResult(a, false); Replay.open(a); Replay.pause(); const old = Replay.pad;
+    showResult(g, false); Replay.open(g); Replay.pause();
+    return { oldAttached: old.el.isConnected, kbs: document.querySelectorAll('#rp-kb .kb').length, pad: Replay.cur === Replay.pad, target: $('#rp-target').textContent };
+  }, v3));
   // 6. align correctness
   await run('6 align', base, p => p.evaluate(() => [align('people', 'peqple').dist, align('coming', 'comin').dist, align('abc', '').dist, align('', 'xy').dist, align('kitten', 'sitting').dist]));
   await b.close();

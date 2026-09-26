@@ -65,6 +65,7 @@ ol.steps li::before {
 .prog { font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .word { font-size: clamp(34px, 11vw, 52px); font-weight: 700; letter-spacing: .02em; min-height: 1.3em; margin: 6px 0; }
 .hint { font-size: 14px; color: var(--muted); }
+.word.digits { letter-spacing: .3em; padding-left: .3em; font-variant-numeric: tabular-nums; }
 
 /* Result */
 .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 16px 0 4px; }
@@ -91,6 +92,8 @@ ol.steps li::before {
 .cmp > .v { font-size: 20px; font-weight: 700; }
 .tiles.three { grid-template-columns: repeat(3, 1fr); }
 .tiles.three .tile b { font-size: 22px; }
+.cmp > .sec { grid-column: 1 / -1; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); background: var(--bg); padding: 6px 12px; }
+.sub { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 14px 0 -8px; }
 
 /* Pass screens */
 .page.center { margin: auto; }
@@ -127,6 +130,7 @@ ol.steps li::before {
 .kb .key.down { background: var(--kb-down); }
 .kb .key.sp.down, .kb .key.enter.down { filter: brightness(.85); }
 .kb .key svg { width: 24px; height: 24px; }
+.kb.pad .key.L { font-size: 26px; }
 .kb .dots { position: absolute; inset: 0; pointer-events: none; }
 .kb .dot { position: absolute; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; background: #ff3b30; border: 2px solid #fff; }
 .kb .dot.old { width: 8px; height: 8px; margin: -4px 0 0 -4px; border: 0; opacity: .45; }
@@ -167,15 +171,16 @@ ol.steps li::before {
 
     <h2>How it works</h2>
     <ol class="steps">
-      <li>The test has <b>2 passes</b> of <b id="n-words">5</b> words each. In <b>pass 1</b> you hold your phone however is most comfortable. In <b>pass 2</b> you type with only the <b>thumb of your non-dominant hand</b>. Each pass starts with a short instruction.</li>
+      <li>The test has <b>2 passes</b>. Each pass has <b id="n-words">5</b> words<span class="num-only">, then <b id="n-seqs">3</b> six-digit numbers</span>. In <b>pass 1</b> you hold your phone however is most comfortable. In <b>pass 2</b> you type with only the <b>thumb of your non-dominant hand</b>. Each pass starts with a short instruction.</li>
       <li>Tap <b>Start</b>. When a pass begins, a word appears at the top of the screen.</li>
       <li>Type the word on the keyboard below. Most key labels are blank. Only the word's <b>first letter</b> and a few random keys are labelled.</li>
       <li>What you type is <b>hidden</b>, so don't look for it. Keep going as you would normally.</li>
       <li>If you <em>feel</em> you made a mistake, you can fix it with <b>⌫</b>. When you think the word is done, tap <b>Submit</b>.</li>
-      <li>After pass 1 you'll see a quick summary. Pass 2 uses the same words in a new order.</li>
+      <li class="num-only">After the words, a <b>number pad</b> appears. Only 2 digits are labelled: the number's <b>first digit</b> and one other. Type the 6 digits the same way, then tap <b>Submit</b>.</li>
+      <li>After pass 1 you'll see a quick summary. Pass 2 uses the same words<span class="num-only"> and numbers</span> in a new order.</li>
       <li>At the end, see how the two passes compare, then tap <b>Share</b> to send your recording to the researcher.</li>
     </ol>
-    <p class="note">Type as naturally and quickly as you would in a message. Don't aim for perfection: mistakes are part of what's being measured. No personal or device information is collected, only the words and your taps.</p>
+    <p class="note">Type as naturally and quickly as you would in a message. Don't aim for perfection: mistakes are part of what's being measured. No personal or device information is collected, only the words<span class="num-only">, numbers</span> and your taps.</p>
     <p class="note" id="ios-hint" hidden>For a true full-screen view on iPhone, tap <b>Share → Add to Home Screen</b> and open the test from your home screen.</p>
 
     <div style="margin-top:24px">
@@ -210,6 +215,10 @@ ol.steps li::before {
     <div class="tiles" id="r-tiles"></div>
     <h2>Word by word</h2>
     <div class="rows" id="r-rows"></div>
+    <div id="r-nums">
+      <h2>Number by number</h2>
+      <div class="rows" id="r-nrows"></div>
+    </div>
     <div class="actions">
       <button class="btn wide" id="btn-share">Share recording</button>
       <button class="btn ghost" id="btn-replay">Replay</button>
@@ -256,20 +265,26 @@ const PASSES = [
     grip: 'comfortable', title: 'Your most comfortable grip', short: 'Comfortable grip',
     how: 'Hold your phone however is most comfortable: one hand or two, any fingers or thumbs.',
     task: 'Type each word the way you normally would when texting.',
+    numHow: 'Keep your most comfortable grip.',
     hint: 'Type it from memory, then tap Submit', maxTouches: Infinity,
   },
   {
     grip: 'nondominant-thumb', title: 'Non-dominant hand, thumb only', short: 'Non-dominant thumb',
     how: 'Now hold your phone in one hand only: your non-dominant one (your left hand if you\'re right-handed).',
     task: 'Type using only the thumb of that hand. Only one touch counts at a time.',
+    numHow: 'Keep using only the thumb of your non-dominant hand.',
     hint: 'Non-dominant thumb only, then tap Submit', maxTouches: 1,
   },
 ];
 const gripName = g => (PASSES.find(P => P.grip === g) || { short: 'Single pass' }).short;
 const VISIBLE_LABELS = 7; // of 26 letters, i.e. ~75% hidden: the word's first letter + 6 random others
 const LETTERS = 'abcdefghijklmnopqrstuvwxyz';
+const SEQ_LEN = 6; // digits per number
+const VISIBLE_DIGITS = 2; // of 10: the number's first digit + 1 random digit not in it
+const DIGITS = '0123456789';
 const params = new URLSearchParams(location.search);
 const N = Math.max(1, Math.min(WORDS.length, parseInt(params.get('n'), 10) || 5));
+const D = Math.max(0, Math.min(10, Number.isFinite(parseInt(params.get('d'), 10)) ? parseInt(params.get('d'), 10) : 3)); // numbers per pass
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 
@@ -359,6 +374,42 @@ const SKINS = {
     return { toolbar: 44, areaH: 214, strip: 0, keys };
   },
 };
+// Number pads (phone layout, 1-2-3 on top) as each platform shows them for numeric fields.
+// Row 0 is a full-width Submit bar, which the real pads don't have (the iOS pad has no Enter key).
+// On Gboard/Samsung the pad's own Go key is drawn but inert.
+const padSpace = keys => keys.forEach(k => { if (k.k === ' ') k.cls = 'sp'; }); // styled like the rest of its column
+const PADS = {
+  ios() {
+    const P = v => v / 390, keys = [], cols = [6, 134, 262];
+    keys.push({ k: 'enter', x: P(6), w: P(378), y: 6, h: 42 });
+    ['123', '456', '789'].forEach((r, i) => [...r].forEach((c, j) => keys.push({ k: c, x: P(cols[j]), w: P(122), y: 56 + 54 * i, h: 46 })));
+    keys.push({ k: 'blank', cls: 'bare', x: P(cols[0]), w: P(122), y: 218, h: 46 }); // empty on iOS, but taps there are kept
+    keys.push({ k: '0', x: P(cols[1]), w: P(122), y: 218, h: 46 }, { k: '<', cls: 'bare', x: P(cols[2]), w: P(122), y: 218, h: 46 });
+    return { toolbar: 0, areaH: 270, strip: 0, keys };
+  },
+  gboard() {
+    const keys = [], g = 6 / 411, r = (y, spec) => unitRow(keys, y, 48, g, spec);
+    r(6, [['enter', 10]]);
+    const d = c => [c, 2.6];
+    r(60, [d('1'), d('2'), d('3'), ['-', 2.2, '-']]);
+    r(116, [d('4'), d('5'), d('6'), [' ', 2.2, '␣']]);
+    r(172, [d('7'), d('8'), d('9'), ['<', 2.2]]);
+    r(228, [[',', 2.6, ','], d('0'), ['.', 2.6, '.'], ['go', 2.2, 'Go']]);
+    padSpace(keys);
+    return { toolbar: 0, areaH: 282, strip: 0, keys };
+  },
+  samsung() {
+    const keys = [], g = 5 / 360, r = (y, spec) => unitRow(keys, y, 46, g, spec);
+    r(6, [['enter', 10]]);
+    const d = c => [c, 2.6];
+    r(58, [d('1'), d('2'), d('3'), ['-', 2.2, '-']]);
+    r(110, [d('4'), d('5'), d('6'), [' ', 2.2, '␣']]);
+    r(162, [d('7'), d('8'), d('9'), ['<', 2.2]]);
+    r(214, [[',', 2.6, ','], d('0'), ['.', 2.6, '.'], ['go', 2.2, 'Go']]);
+    padSpace(keys);
+    return { toolbar: 0, areaH: 266, strip: 0, keys };
+  },
+};
 // Own keys only, so untrusted names like "constructor" aren't treated as skins.
 function isSkin(name) { return typeof name === 'string' && Object.prototype.hasOwnProperty.call(SKINS, name); }
 
@@ -370,7 +421,8 @@ const ICONS = {
   mic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="9" y="3.5" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3"/></svg>',
 };
 const isLetter = k => k.length === 1 && k >= 'a' && k <= 'z';
-const isTyping = k => isLetter(k) || k === ' ' || k === '<';
+const isDigit = k => k.length === 1 && k >= '0' && k <= '9';
+const isTyping = k => isLetter(k) || isDigit(k) || k === ' ' || k === '<';
 
 class Keyboard {
   constructor(host, skin, opts = {}) {
@@ -379,15 +431,16 @@ class Keyboard {
     this.enabled = false;
     this.maxTouches = Infinity; // 1 = single finger: extra touches are reported to onBlocked, not typed
     this.active = new Map();
-    const s = this.s = SKINS[skin](skin === 'ios' && HAS_NOTCH);
+    this.pad = !!opts.pad; // number pad instead of letters
+    const s = this.s = (this.pad ? PADS : SKINS)[skin](skin === 'ios' && HAS_NOTCH);
     const el = this.el = document.createElement('div');
-    el.className = 'kb';
+    el.className = this.pad ? 'kb pad' : 'kb';
     el.dataset.skin = skin;
     el.style.height = `calc(${s.toolbar + s.areaH + s.strip}px + env(safe-area-inset-bottom))`;
     for (const key of s.keys) {
       const d = key.el = document.createElement('div');
-      d.className = 'key ' + (isLetter(key.k) ? 'L' : key.k === ' ' ? 'space' : key.k === 'enter' ? 'enter'
-        : key.k === 'globe' || key.k === 'mic' ? 'bare' : 'sp');
+      d.className = 'key ' + (key.cls || (isLetter(key.k) || isDigit(key.k) ? 'L' : key.k === ' ' ? 'space' : key.k === 'enter' ? 'enter'
+        : key.k === 'globe' || key.k === 'mic' ? 'bare' : 'sp'));
       if (key.k === 'enter') d.textContent = 'Submit';
       else if (ICONS[key.k]) d.innerHTML = ICONS[key.k];
       else if (key.label != null) d.textContent = key.label;
@@ -420,8 +473,8 @@ class Keyboard {
     }
   }
 
-  setLabels(visible) { // visible: Set of letters, or null for all
-    for (const k of this.s.keys) if (isLetter(k.k)) k.el.textContent = !visible || visible.has(k.k) ? k.k : '';
+  setLabels(visible) { // visible: Set of letters/digits, or null for all
+    for (const k of this.s.keys) if (isLetter(k.k) || isDigit(k.k)) k.el.textContent = !visible || visible.has(k.k) ? k.k : '';
   }
 
   hit(px, py) {
@@ -479,6 +532,11 @@ class Keyboard {
     for (const t of ['touchstart', 'touchend']) el.addEventListener(t, e => e.preventDefault(), { passive: false });
   }
 
+  mount(host) { // show this keyboard in host (a host holds one keyboard at a time)
+    if (this.el.parentNode !== host) host.replaceChildren(this.el);
+    this.layout();
+  }
+
   destroy() {
     if (this.ro) this.ro.disconnect();
     else removeEventListener('resize', this.onResize);
@@ -506,7 +564,7 @@ function typedOf(ev, upTo = Infinity) {
   for (const e of ev) {
     if (e[0] > upTo) break;
     if (e[2] === '<') s = s.slice(0, -1);
-    else if (isLetter(e[2]) || e[2] === ' ') s += e[2];
+    else if (isLetter(e[2]) || isDigit(e[2]) || e[2] === ' ') s += e[2];
   }
   return s;
 }
@@ -527,18 +585,20 @@ function align(a, b) {
   }
   return { dist: d[n][m], ops: ops.reverse() };
 }
+const targetOf = tr => tr.seq != null ? tr.seq : tr.word; // number trial or word trial
 function metrics(tr) {
-  const typed = typedOf(tr.ev);
-  const { dist, ops } = align(tr.word, typed);
+  const typed = typedOf(tr.ev), target = targetOf(tr);
+  const { dist, ops } = align(target, typed);
   const keys = tr.ev.filter(e => isTyping(e[2]));
   const first = keys.length ? keys[0][0] : null, last = keys.length ? keys[keys.length - 1][0] : null;
   const dur = keys.length > 1 ? last - first : 0;
   return {
     typed, ops, dist,
-    exact: typed === tr.word,
-    acc: 1 - dist / Math.max(tr.word.length, typed.length, 1),
+    exact: typed === target,
+    acc: 1 - dist / Math.max(target.length, typed.length, 1),
     rt: first,
     wpm: typed.length > 1 && dur > 0 ? (typed.length - 1) / (dur / 1000) * 60 / 5 : null,
+    dps: typed.length > 1 && dur > 0 ? (typed.length - 1) / (dur / 1000) : null, // digits (chars) per second
     strokes: keys.length,
     backspaces: keys.filter(e => e[2] === '<').length,
     stray: tr.ev.length - keys.length,
@@ -552,6 +612,7 @@ function summarize(trials) {
     exact: ms.filter(m => m.exact).length,
     acc: mean(ms.map(m => m.acc)),
     wpm: mean(ms.map(m => m.wpm).filter(v => v != null)),
+    dps: mean(ms.map(m => m.dps).filter(v => v != null)),
     rt: median(ms.map(m => m.rt).filter(v => v != null)),
   };
 }
@@ -601,32 +662,33 @@ async function decode(code) {
   return validate(JSON.parse(new TextDecoder().decode(bytes)));
 }
 // Recordings from links/files are untrusted: rebuild them strictly.
-// v1 (single pass, top-level `trials`) is upgraded to the v2 shape with one pass.
+// v1 (single pass, top-level `trials`) and v2 (no numbers) are upgraded to the v3 shape.
 function validate(o) {
   if (!o || typeof o !== 'object') throw new Error('Not a recording');
   const num = v => Number.isFinite(+v) ? Math.round(+v) : 0;
   const list = a => Array.isArray(a) ? a : [];
-  const trialsOf = arr => list(arr).filter(t => t && typeof t === 'object').slice(0, 50).map(t => {
-    const tr = {
-      word: String(t.word || '').toLowerCase().replace(/[^a-z]/g, '').slice(0, 20),
-      vis: list(t.vis).map(String).filter(isLetter).slice(0, 26),
-      ev: list(t.ev).filter(Array.isArray).slice(0, 1000)
-        .map(e => [num(e[0]), num(e[1]), String(e[2]).slice(0, 8), num(e[3]), num(e[4])])
-        .sort((a, b) => a[0] - b[0]),
-      submit: num(t.submit),
-    };
+  // Word trials have `word` + letter labels; number trials have `seq` + digit labels.
+  const trialsOf = (arr, isNum) => list(arr).filter(t => t && typeof t === 'object').slice(0, 50).map(t => {
+    const tr = isNum
+      ? { seq: String(t.seq || '').replace(/[^0-9]/g, '').slice(0, 12), vis: list(t.vis).map(String).filter(isDigit).slice(0, 10) }
+      : { word: String(t.word || '').toLowerCase().replace(/[^a-z]/g, '').slice(0, 20), vis: list(t.vis).map(String).filter(isLetter).slice(0, 26) };
+    tr.ev = list(t.ev).filter(Array.isArray).slice(0, 1000)
+      .map(e => [num(e[0]), num(e[1]), String(e[2]).slice(0, 8), num(e[3]), num(e[4])])
+      .sort((a, b) => a[0] - b[0]);
+    tr.submit = num(t.submit);
     const blocked = list(t.blocked).filter(Array.isArray).slice(0, 1000).map(b => [num(b[0]), String(b[1]).slice(0, 8), num(b[2]), num(b[3])]);
     if (blocked.length) tr.blocked = blocked;
     return tr;
   });
   let passes;
-  if (o.v === 1) passes = [{ grip: null, trials: trialsOf(o.trials) }];
-  else if (o.v === 2) passes = list(o.passes).filter(p => p && typeof p === 'object').slice(0, 4)
-    .map(p => ({ grip: PASSES.some(P => P.grip === p.grip) ? p.grip : null, trials: trialsOf(p.trials) }));
+  if (o.v === 1) passes = [{ grip: null, trials: trialsOf(o.trials), nums: [] }];
+  else if (o.v === 2 || o.v === 3) passes = list(o.passes).filter(p => p && typeof p === 'object').slice(0, 4).map(p => ({
+    grip: PASSES.some(P => P.grip === p.grip) ? p.grip : null, trials: trialsOf(p.trials), nums: trialsOf(p.nums, true),
+  }));
   else throw new Error('Not a recording');
-  passes = passes.filter(p => p.trials.length);
+  passes = passes.filter(p => p.trials.length || p.nums.length);
   if (!passes.length) throw new Error('Recording has no words');
-  return { v: 2, kb: isSkin(o.kb) ? o.kb : 'gboard', seed: String(o.seed || '').slice(0, 32), n: passes[0].trials.length, passes };
+  return { v: 3, kb: isSkin(o.kb) ? o.kb : 'gboard', seed: String(o.seed || '').slice(0, 32), n: passes[0].trials.length, d: passes[0].nums.length, passes };
 }
 const baseUrl = () => location.href.split('#')[0];
 
@@ -654,7 +716,8 @@ document.addEventListener('dblclick', e => e.preventDefault());
 // ---------- Session ----------
 let SKIN = isSkin(params.get('kb')) ? params.get('kb') : IS_IOS ? 'ios' : 'gboard';
 const skinReady = detectSkin().then(s => { SKIN = s; });
-const S = { rec: null, plan: [], p: 0, i: 0, t0: 0, ev: [], blocked: [], kb: null, link: null, live: false };
+const S = { rec: null, plan: [], p: 0, i: 0, num: false, t0: 0, ev: [], blocked: [], kb: null, pad: null, link: null, live: false };
+const curKb = () => S.num ? S.pad : S.kb;
 
 function goFullscreen() {
   const d = document.documentElement, req = d.requestFullscreen || d.webkitRequestFullscreen;
@@ -671,13 +734,21 @@ async function startSession() {
   const seed = params.get('seed') || Math.random().toString(36).slice(2, 8);
   const r = rng(seed);
   const words = shuffle([...WORDS], r).slice(0, N);
-  // Pass 2 reuses pass 1's words in a new order. Labels are re-drawn per pass:
-  // the word's first letter + random letters that are not in the word.
+  // Numbers use their own stream, so a seed gives the same words with or without them.
+  const rn = rng(seed + '#numbers');
+  const seqs = Array.from({ length: D }, () => Array.from({ length: SEQ_LEN }, () => DIGITS[Math.floor(rn() * 10)]).join(''));
+  // Pass 2 reuses pass 1's words and numbers in a new order. Labels are re-drawn per pass:
+  // the first letter/digit + random letters/digits that are not in the word/number.
+  const labels = (s, pool, k, rr) => [s[0], ...shuffle([...pool].filter(c => !s.includes(c)), rr).slice(0, k - 1)];
   S.plan = PASSES.map((P, pi) => {
     const ws = pi ? shuffle([...words], r) : words;
-    return { words: ws, vis: ws.map(w => [w[0], ...shuffle([...LETTERS].filter(c => !w.includes(c)), r).slice(0, VISIBLE_LABELS - 1)]) };
+    const ss = pi ? shuffle([...seqs], rn) : seqs;
+    return {
+      words: ws, vis: ws.map(w => labels(w, LETTERS, VISIBLE_LABELS, r)),
+      seqs: ss, seqVis: ss.map(q => labels(q, DIGITS, VISIBLE_DIGITS, rn)),
+    };
   });
-  S.rec = { v: 2, kb: SKIN, seed, n: words.length, passes: PASSES.map(P => ({ grip: P.grip, trials: [] })) };
+  S.rec = { v: 3, kb: SKIN, seed, n: words.length, d: seqs.length, passes: PASSES.map(P => ({ grip: P.grip, trials: [], nums: [] })) };
   S.p = 0;
   S.live = true;
   showPassIntro();
@@ -693,41 +764,65 @@ function showPassIntro() {
   show('s-pass');
 }
 
+function showNumbersIntro() {
+  const P = PASSES[S.p];
+  $('#p-step').textContent = `Pass ${S.p + 1} of ${PASSES.length} · numbers`;
+  $('#p-title').textContent = 'Now numbers';
+  $('#p-body').innerHTML = `<p class="grip">${esc(P.numHow)}</p>
+    <p>Type each ${SEQ_LEN}-digit number on the number pad, then tap Submit. Only ${VISIBLE_DIGITS} digits are labelled: the number's first digit and one other.</p>`;
+  $('#btn-pass').textContent = 'Begin numbers';
+  $('#btn-pass').onclick = beginNumbers;
+  show('s-pass');
+}
+
 function showPassSummary() {
-  const sum = summarize(S.rec.passes[S.p].trials);
+  const pass = S.rec.passes[S.p];
+  const tiles = (sum, speed) => `<div class="tiles three">${[
+    [`${sum.exact}/${sum.n}`, 'exactly right'], [pct(sum.acc), 'accuracy'], speed(sum),
+  ].map(([b, t]) => `<div class="tile"><b>${esc(b)}</b><span>${t}</span></div>`).join('')}</div>`;
+  const wordTiles = tiles(summarize(pass.trials), s => [fmt(s.wpm), 'words / min']);
   $('#p-step').textContent = `Pass ${S.p + 1} of ${PASSES.length} · done`;
   $('#p-title').textContent = `Pass ${S.p + 1} complete`;
-  $('#p-body').innerHTML = `<div class="tiles three">${[
-    [`${sum.exact}/${sum.n}`, 'exactly right'], [pct(sum.acc), 'accuracy'], [fmt(sum.wpm), 'words / min'],
-  ].map(([b, t]) => `<div class="tile"><b>${esc(b)}</b><span>${t}</span></div>`).join('')}</div>
-    <p style="margin-top:16px">Next: the same words in a new order, typed with a different grip.</p>`;
+  $('#p-body').innerHTML = (pass.nums.length
+    ? `<p class="sub">Words</p>${wordTiles}<p class="sub">Numbers</p>${tiles(summarize(pass.nums), s => [fmt(s.dps, 1), 'digits / s'])}`
+    : wordTiles) +
+    `<p style="margin-top:16px">Next: the same ${pass.nums.length ? 'words and numbers' : 'words'} in a new order, typed with a different grip.</p>`;
   $('#btn-pass').textContent = `Continue to pass ${S.p + 2} →`;
   $('#btn-pass').onclick = () => { S.p++; showPassIntro(); };
   show('s-pass');
 }
 
-function beginPass() {
+// Starts the word (num = false) or number (num = true) part of the current pass.
+function beginPart(num) {
+  S.num = num;
   S.i = 0;
   show('s-trial');
-  if (!S.kb || S.kb.skin !== SKIN) {
-    if (S.kb) S.kb.destroy();
-    S.kb = new Keyboard($('#t-kb'), SKIN, { onPress, onBlocked });
+  const key = num ? 'pad' : 'kb';
+  if (!S[key] || S[key].skin !== SKIN) {
+    if (S[key]) S[key].destroy();
+    S[key] = new Keyboard($('#t-kb'), SKIN, { onPress, onBlocked, pad: num });
   }
-  S.kb.maxTouches = PASSES[S.p].maxTouches;
+  const kb = S[key];
+  kb.mount($('#t-kb'));
+  kb.maxTouches = PASSES[S.p].maxTouches;
   $('#t-hint').textContent = PASSES[S.p].hint;
+  $('#t-word').classList.toggle('digits', num);
   nextTrial();
 }
+const beginPass = () => beginPart(false);
+const beginNumbers = () => beginPart(true);
+const endPass = () => S.p < PASSES.length - 1 ? showPassSummary() : finish();
 
 function nextTrial() {
-  const kb = S.kb, plan = S.plan[S.p];
+  const kb = curKb(), plan = S.plan[S.p], items = S.num ? plan.seqs : plan.words;
   kb.enabled = false;
   kb.cancelAll();
   $('#t-word').textContent = '';
-  if (S.i >= plan.words.length) return S.p < PASSES.length - 1 ? showPassSummary() : finish();
-  $('#t-prog').textContent = `Pass ${S.p + 1} · Word ${S.i + 1} of ${plan.words.length}`;
-  kb.setLabels(new Set(plan.vis[S.i]));
+  if (S.i >= items.length) return !S.num && plan.seqs.length ? showNumbersIntro() : endPass();
+  $('#t-prog').textContent = `Pass ${S.p + 1} · ${S.num ? 'Number' : 'Word'} ${S.i + 1} of ${items.length}`;
+  kb.setLabels(new Set((S.num ? plan.seqVis : plan.vis)[S.i]));
   setTimeout(() => {
-    $('#t-word').textContent = plan.words[S.i];
+    $('#t-word').textContent = items[S.i];
     // Start the clock once the word has actually been painted.
     requestAnimationFrame(() => requestAnimationFrame(() => {
       S.t0 = performance.now();
@@ -742,9 +837,11 @@ function onPress(p) {
   const t = Math.round(p.t - S.t0);
   if (p.k === 'enter') {
     const plan = S.plan[S.p];
-    const tr = { word: plan.words[S.i], vis: plan.vis[S.i], ev: S.ev.sort((a, b) => a[0] - b[0]), submit: t };
+    const tr = S.num ? { seq: plan.seqs[S.i], vis: plan.seqVis[S.i] } : { word: plan.words[S.i], vis: plan.vis[S.i] };
+    tr.ev = S.ev.sort((a, b) => a[0] - b[0]);
+    tr.submit = t;
     if (S.blocked.length) tr.blocked = S.blocked;
-    S.rec.passes[S.p].trials.push(tr);
+    S.rec.passes[S.p][S.num ? 'nums' : 'trials'].push(tr);
     S.i++;
     nextTrial();
     return;
@@ -754,7 +851,7 @@ function onPress(p) {
 
 // Extra fingers during a one-touch pass: not typed, but kept as evidence.
 function onBlocked(b) {
-  if (S.kb.enabled) S.blocked.push([Math.round(b.t - S.t0), b.k, b.x, b.y]);
+  if (curKb().enabled) S.blocked.push([Math.round(b.t - S.t0), b.k, b.x, b.y]);
 }
 
 function finish() {
@@ -769,31 +866,38 @@ const fmt = (v, d = 0) => v == null ? '–' : v.toFixed(d);
 function showResult(rec, live) {
   S.rec = rec;
   S.live = live;
-  const passes = rec.passes, multi = passes.length > 1;
-  const sums = passes.map(p => summarize(p.trials));
+  const passes = rec.passes, multi = passes.length > 1, hasNums = passes.some(p => p.nums.length);
   $('#r-title').textContent = live ? 'Your results' : 'Recording';
-  const rows = [
-    ['Exactly right', s => `${s.exact}/${s.n}`],
-    ['Accuracy', s => pct(s.acc)],
-    ['Words / min', s => fmt(s.wpm)],
-    ['First key', s => s.rt == null ? '–' : `${Math.round(s.rt)} ms`],
+  const common = [['Exactly right', s => `${s.exact}/${s.n}`], ['Accuracy', s => pct(s.acc)]];
+  const firstKey = ['First key', s => s.rt == null ? '–' : `${Math.round(s.rt)} ms`];
+  const parts = [
+    { name: 'Words', key: 'trials', rows: [...common, ['Words / min', s => fmt(s.wpm)], firstKey] },
+    ...(hasNums ? [{ name: 'Numbers', key: 'nums', rows: [...common, ['Digits / s', s => fmt(s.dps, 1)], firstKey] }] : []),
   ];
+  for (const part of parts) part.sums = passes.map(p => summarize(p[part.key]));
   $('#r-tiles').outerHTML = multi
     ? `<div class="cmp" id="r-tiles"><div class="h"></div>${passes.map((p, i) => `<div class="h">Pass ${i + 1}<br>${esc(gripName(p.grip))}</div>`).join('')}
-        ${rows.map(([l, f]) => `<div class="l">${l}</div>${sums.map(s => `<div class="v">${esc(f(s))}</div>`).join('')}`).join('')}</div>`
-    : `<div class="tiles" id="r-tiles">${rows.map(([l, f]) => `<div class="tile"><b>${esc(f(sums[0]))}</b><span>${l.toLowerCase()}</span></div>`).join('')}</div>`;
-  // One card per word, with a line per pass (pass 2 has the same words in another order).
-  $('#r-rows').innerHTML = passes[0].trials.map(tr0 => {
+        ${parts.map(part => (hasNums ? `<div class="sec">${part.name}</div>` : '') +
+          part.rows.map(([l, f]) => `<div class="l">${l}</div>${part.sums.map(s => `<div class="v">${esc(f(s))}</div>`).join('')}`).join('')).join('')}</div>`
+    : `<div id="r-tiles">${parts.map(part => (hasNums ? `<p class="sub">${part.name}</p>` : '') +
+        `<div class="tiles">${part.rows.map(([l, f]) => `<div class="tile"><b>${esc(f(part.sums[0]))}</b><span>${l.toLowerCase()}</span></div>`).join('')}</div>`).join('')}</div>`;
+  // One card per word/number, with a line per pass (pass 2 has the same ones in another order).
+  const cards = key => (passes.find(p => p[key].length) || passes[0])[key].map(tr0 => {
+    const target = targetOf(tr0);
     const lines = passes.map((p, pi) => {
-      const tr = p.trials.find(t => t.word === tr0.word);
+      const tr = p[key].find(t => targetOf(t) === target);
       if (!tr) return '';
       const m = metrics(tr);
       const typed = m.ops.map(([c, ch]) => `<span class="${c}">${ch === ' ' ? '␣' : c === 'miss' ? '_' : esc(ch)}</span>`).join('') || '<span class="miss">(nothing)</span>';
+      const speed = key === 'nums' ? `${fmt(m.dps, 1)} digits/s` : `${fmt(m.wpm)} wpm`;
       return `<div class="pline">${multi ? `<span class="ptag">P${pi + 1}</span>` : ''}<span class="typed">${typed}</span><span class="badge${m.exact ? ' good' : ''}">${m.exact ? 'exact' : pct(m.acc)}</span></div>
-        <div class="stats">${fmt(m.wpm)} wpm · first key ${m.rt == null ? '–' : m.rt + ' ms'} · ${m.strokes} keys${m.backspaces ? ` (${m.backspaces} ⌫)` : ''}${m.stray ? ` · ${m.stray} other` : ''}${m.blocked ? ` · ${m.blocked} blocked` : ''}</div>`;
+        <div class="stats">${speed} · first key ${m.rt == null ? '–' : m.rt + ' ms'} · ${m.strokes} keys${m.backspaces ? ` (${m.backspaces} ⌫)` : ''}${m.stray ? ` · ${m.stray} other` : ''}${m.blocked ? ` · ${m.blocked} blocked` : ''}</div>`;
     }).join('');
-    return `<div class="row${multi ? ' multi' : ''}"><div class="target">${esc(tr0.word)}</div>${lines}</div>`;
+    return `<div class="row${multi ? ' multi' : ''}"><div class="target">${esc(target)}</div>${lines}</div>`;
   }).join('');
+  $('#r-rows').innerHTML = cards('trials');
+  $('#r-nrows').innerHTML = hasNums ? cards('nums') : '';
+  $('#r-nums').hidden = !hasNums;
   $('#btn-again').textContent = live ? 'Play again' : 'Take the test';
   $('#btn-copy').disabled = true;
   S.link = null;
@@ -858,20 +962,23 @@ $('#btn-replay').onclick = () => Replay.open(S.rec);
 
 // ---------- Replay ----------
 const Replay = {
-  rec: null, items: [], kb: null, i: 0, t: 0, playing: false, speed: 1, last: 0, raf: 0,
+  rec: null, items: [], kb: null, pad: null, cur: null, i: 0, t: 0, playing: false, speed: 1, last: 0, raf: 0,
   open(rec) {
     this.rec = rec;
     const multi = rec.passes.length > 1;
-    this.items = rec.passes.flatMap((p, pi) => p.trials.map((t, i) => ({
-      t, label: `${multi ? `Pass ${pi + 1} · ` : ''}Word ${i + 1} of ${p.trials.length}`,
-    })));
+    const items = (p, pi, key, what) => p[key].map((t, i) => ({
+      t, num: key === 'nums', label: `${multi ? `Pass ${pi + 1} · ` : ''}${what} ${i + 1} of ${p[key].length}`,
+    }));
+    this.items = rec.passes.flatMap((p, pi) => [...items(p, pi, 'trials', 'Word'), ...items(p, pi, 'nums', 'Number')]);
     show('s-replay');
     if (!this.kb || this.kb.skin !== rec.kb) {
       if (this.kb) this.kb.destroy();
+      if (this.pad) this.pad.destroy();
       this.kb = new Keyboard($('#rp-kb'), rec.kb);
+      this.pad = new Keyboard($('#rp-kb'), rec.kb, { pad: true });
     }
-    this.kb.layout();
     this.kb.setLabels(null); // all labels visible in replay
+    this.pad.setLabels(null);
     this.select(0);
     this.play();
   },
@@ -879,7 +986,10 @@ const Replay = {
   select(i) {
     this.i = Math.max(0, Math.min(this.items.length - 1, i));
     this.t = -300;
-    $('#rp-target').textContent = `${this.items[this.i].label}: ${this.items[this.i].t.word}`;
+    const item = this.items[this.i];
+    this.cur = item.num ? this.pad : this.kb;
+    this.cur.mount($('#rp-kb'));
+    $('#rp-target').textContent = `${item.label}: ${targetOf(item.t)}`;
     $('#rp-scrub').max = this.end();
     this.render();
   },
@@ -915,8 +1025,8 @@ const Replay = {
     $('#rp-scrub').value = Math.max(0, t);
     const down = new Set(tr.ev.filter(e => t >= e[0] && t < e[0] + Math.max(e[1], 60)).map(e => e[2]));
     if (t >= tr.submit && t < tr.submit + 150) down.add('enter');
-    this.kb.showDown(down);
-    this.kb.showDots([
+    this.cur.showDown(down);
+    this.cur.showDots([
       ...tr.ev.filter(e => e[0] <= t).map(e => ({ x: e[3], y: e[4], old: t > e[0] + Math.max(e[1], 60) + 250 })),
       ...(tr.blocked || []).filter(b => b[0] <= t).map(b => ({ x: b[2], y: b[3], blocked: true })),
     ]);
@@ -934,6 +1044,8 @@ $('#rp-back').onclick = () => { Replay.pause(); show('s-result'); };
 
 // ---------- Intro / loading ----------
 $('#n-words').textContent = N;
+$('#n-seqs').textContent = D;
+document.querySelectorAll('.num-only').forEach(e => { e.hidden = !D; });
 if (IS_IOS && !navigator.standalone) $('#ios-hint').hidden = false;
 $('#btn-start').onclick = startSession;
 $('#btn-load').onclick = () => $('#file').click();

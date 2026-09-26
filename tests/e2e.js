@@ -8,7 +8,15 @@ const out = __dirname + '/out/'; require('fs').mkdirSync(out, { recursive: true 
     const errs = []; page.on('pageerror', e => errs.push(e.message));
     await page.goto(`http://localhost:8765/index.html?n=3&seed=test&kb=${skin}`);
     await page.tap('#btn-start');
-    const center = k => page.evaluate(k => { const r = S.kb.s.keys.find(o => o.k === k).el.getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; }, k);
+    const center = k => page.evaluate(k => { const r = curKb().s.keys.find(o => o.k === k).el.getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; }, k);
+    const tapKey = async k => { const [x, y] = await center(k); await page.touchscreen.tap(x, y); await page.waitForTimeout(30); };
+    const twoFingers = async (a, b) => { // hold one finger, tap with a second -> blocked
+      const [ax, ay] = await center(a), [bx, by] = await center(b);
+      await page.evaluate(([ax, ay, bx, by]) => {
+        const el = curKb().el, pe = (t, id, x, y) => el.dispatchEvent(new PointerEvent(t, { pointerId: id, clientX: x, clientY: y, bubbles: true, cancelable: true, pointerType: 'touch' }));
+        pe('pointerdown', 91, ax, ay); pe('pointerdown', 92, bx, by); pe('pointerup', 92, bx, by); pe('pointerup', 91, ax, ay);
+      }, [ax, ay, bx, by]);
+    };
     for (let pass = 0; pass < 2; pass++) {
       await page.waitForSelector('#s-pass.on'); await page.waitForTimeout(450);
       if (skin === 'ios') await page.screenshot({ path: `${out}pass${pass + 1}-intro.png` });
@@ -18,18 +26,25 @@ const out = __dirname + '/out/'; require('fs').mkdirSync(out, { recursive: true 
         const word = await page.evaluate(() => S.plan[S.p].words[S.i]);
         let seq = [...word];
         if (pass === 1 && w === 0) seq[1] = 'q';
-        for (const k of seq) {
-          const [x, y] = await center(k);
-          await page.touchscreen.tap(x, y); await page.waitForTimeout(30);
-        }
-        if (pass === 1 && w === 1) { // hold one finger, tap with a second -> blocked
-          const [ax, ay] = await center('a'), [bx, by] = await center('b');
-          await page.evaluate(([ax, ay, bx, by]) => {
-            const el = S.kb.el, pe = (t, id, x, y) => el.dispatchEvent(new PointerEvent(t, { pointerId: id, clientX: x, clientY: y, bubbles: true, cancelable: true, pointerType: 'touch' }));
-            pe('pointerdown', 91, ax, ay); pe('pointerdown', 92, bx, by); pe('pointerup', 92, bx, by); pe('pointerup', 91, ax, ay);
-          }, [ax, ay, bx, by]);
-        }
-        const [x, y] = await center('enter'); await page.touchscreen.tap(x, y);
+        for (const k of seq) await tapKey(k);
+        if (pass === 1 && w === 1) await twoFingers('a', 'b');
+        await tapKey('enter');
+      }
+      // Numbers: intro screen, then 3 sequences on the pad.
+      await page.waitForSelector('#s-pass.on'); await page.waitForTimeout(450);
+      if (skin === 'ios' && pass === 0) await page.screenshot({ path: `${out}numbers-intro.png` });
+      await page.tap('#btn-pass');
+      for (let q = 0; q < 3; q++) {
+        await page.waitForFunction(() => S.pad && S.pad.enabled && S.num);
+        if (pass === 0 && q === 0) await page.screenshot({ path: `${out}${skin}-pad.png` });
+        const digits = [...await page.evaluate(() => S.plan[S.p].seqs[S.i])];
+        const wrong = d => String((+d + 1) % 10);
+        if (pass === 0 && q === 1) { await tapKey(wrong(digits[0])); await tapKey('<'); } // fixed with ⌫
+        if (pass === 0 && q === 2) digits[3] = wrong(digits[3]); // left wrong
+        for (const d of digits) await tapKey(d);
+        if (pass === 1 && q === 0) await twoFingers('5', '8');
+        if (pass === 1 && q === 1) await tapKey(skin === 'ios' ? 'blank' : 'go'); // inert, recorded
+        await tapKey('enter');
       }
       if (pass === 0) { await page.waitForSelector('#s-pass.on'); if (skin === 'ios') await page.screenshot({ path: `${out}pass1-summary.png` }); await page.waitForTimeout(450); await page.tap('#btn-pass'); }
     }
@@ -42,6 +57,12 @@ const out = __dirname + '/out/'; require('fs').mkdirSync(out, { recursive: true 
       vis7: S.rec.passes.every(p => p.trials.every(t => t.vis.length === 7)),
       labelsDiffer: S.rec.passes[0].trials.some(t => JSON.stringify(t.vis) !== JSON.stringify(S.rec.passes[1].trials.find(u => u.word === t.word).vis)),
       blocked: S.rec.passes.map(p => p.trials.map(t => (t.blocked || []).length)),
+      nums: S.rec.passes.map(p => p.nums.map(t => t.seq).join(',')),
+      numsTyped: S.rec.passes.map(p => p.nums.map(t => typedOf(t.ev)).join(',')),
+      numVis: S.rec.passes.every(p => p.nums.every(t => t.vis.length === 2 && t.vis[0] === t.seq[0] && !t.seq.includes(t.vis[1]))),
+      numBlocked: S.rec.passes.map(p => p.nums.map(t => (t.blocked || []).length)),
+      numStray: S.rec.passes.map(p => p.nums.map(t => t.ev.filter(e => !isTyping(e[2])).map(e => e[2]).join('') || '-')),
+      numRows: document.querySelectorAll('#r-nrows .row').length,
       linkLen: S.link.length,
     }));
     console.log(skin, JSON.stringify(res));
@@ -49,9 +70,14 @@ const out = __dirname + '/out/'; require('fs').mkdirSync(out, { recursive: true 
     await p2.goto(await page.evaluate(() => S.link)); await p2.waitForSelector('#s-result.on');
     console.log(skin, 'link identical:', await p2.evaluate(o => JSON.stringify(S.rec) === o, await page.evaluate(() => JSON.stringify(S.rec))));
     await p2.waitForTimeout(450); await p2.tap('#btn-replay');
-    await p2.evaluate(() => { Replay.pause(); Replay.select(4); Replay.t = Replay.end(); Replay.render(); });
-    if (skin === 'gboard') await p2.screenshot({ path: `${out}replay-blocked.png` });
-    console.log(skin, 'replay item 5:', await p2.textContent('#rp-target'), '| pos', await p2.textContent('#rp-pos'), '| blocked dots', await p2.evaluate(() => document.querySelectorAll('.dot.blocked').length));
+    const replayAt = async (label, shot) => {
+      await p2.evaluate(l => { Replay.pause(); Replay.select(Replay.items.findIndex(it => it.label === l)); Replay.t = Replay.end(); Replay.render(); }, label);
+      if (shot) await p2.screenshot({ path: `${out}${shot}.png` });
+      console.log(skin, 'replay', label + ':', await p2.textContent('#rp-target'), '| pos', await p2.textContent('#rp-pos'),
+        '| pad', await p2.evaluate(() => !!document.querySelector('#rp-kb .kb.pad')), '| blocked dots', await p2.evaluate(() => document.querySelectorAll('.dot.blocked').length));
+    };
+    await replayAt('Pass 2 · Word 2 of 3', skin === 'gboard' && 'replay-blocked');
+    await replayAt('Pass 2 · Number 1 of 3', `${skin}-replay-pad`);
     console.log(skin, 'errors:', errs, errs2);
     await ctx.close();
   }
@@ -63,5 +89,11 @@ const out = __dirname + '/out/'; require('fs').mkdirSync(out, { recursive: true 
   await p.waitForSelector('#s-result.on');
   console.log('v1 load:', await p.evaluate(() => JSON.stringify({ v: S.rec.v, passes: S.rec.passes.length, grip: S.rec.passes[0].grip, cmp: !!document.querySelector('.cmp'), tiles: document.querySelectorAll('.tile').length })));
   await p.waitForTimeout(450); await p.tap('#btn-replay'); console.log('v1 replay:', await p.textContent('#rp-target'));
+  // ?d=0: words only, no numbers intro
+  await p.goto('http://localhost:8765/index.html?n=1&d=0&seed=test&kb=gboard'); await p.tap('#btn-start');
+  await p.waitForSelector('#s-pass.on'); await p.waitForTimeout(450); await p.tap('#btn-pass');
+  await p.waitForFunction(() => S.kb && S.kb.enabled); await p.evaluate(() => onPress({ k: 'enter', t: performance.now() }));
+  await p.waitForSelector('#s-pass.on');
+  console.log('d=0:', await p.evaluate(() => JSON.stringify({ title: $('#p-title').textContent, d: S.rec.d, introHidden: [...document.querySelectorAll('.num-only')].every(e => e.hidden) })));
   await browser.close();
 })();
