@@ -1,6 +1,6 @@
 # Muscle-Memory Typing Test
 
-A single static `index.html` with no dependencies and no backend. Participants type common words on an on-screen keyboard that copies their phone's own keyboard, with about 90% of the letter labels hidden. Every tap is recorded so the session can be replayed and analyzed.
+A single static `index.html` with no dependencies and no backend. Participants type common words on an on-screen keyboard that copies their phone's own keyboard, with about 75% of the letter labels hidden (7 of 26 shown). Every tap is recorded so the session can be replayed and analyzed.
 
 ## Run / host
 - Local: `python3 -m http.server 8000`, then open `http://<your-LAN-ip>:8000/` on a phone.
@@ -10,7 +10,7 @@ A single static `index.html` with no dependencies and no backend. Participants t
 ## URL parameters
 | Param | Meaning |
 |---|---|
-| `?n=10` | Words per session (1–20, default 10) |
+| `?n=5` | Words per session (1–20, default 5) |
 | `?seed=abc` | Fixed word order and fixed hidden labels. Give every participant the same seed to get identical tasks. |
 | `?kb=ios\|gboard\|samsung` | Force a keyboard skin. By default it's detected: iOS → `ios`, Samsung (model `SM-…`) → `samsung`, other Android → `gboard`. |
 | `#r=<data>` | A recording packed into the link. Opens the results and replay. |
@@ -31,14 +31,14 @@ To look at a file again, use **Load a recording** on the intro screen.
   "v": 1,
   "kb": "ios",
   "seed": "k3j9",
-  "n": 10,
+  "n": 5,
   "trials": [
-    { "word": "because", "vis": ["b", "q", "x"], "ev": [[412, 88, "b", 312, 540]], "submit": 2150 }
+    { "word": "because", "vis": ["b", "q", "x", "d", "j", "k", "w"], "ev": [[412, 88, "b", 312, 540]], "submit": 2150 }
   ]
 }
 ```
 - `kb`: the keyboard skin that was shown. It sets how `x`/`y` map onto keys.
-- `vis`: the letters whose labels were visible for that word. The first is always the word's first letter; the other two are random letters that aren't in the word.
+- `vis`: the letters whose labels were visible for that word. The first is always the word's first letter; the other six are random letters that aren't in the word (`VISIBLE_LABELS` in the script).
 - `ev`: one entry per tap, as `[tDown, holdMs, key, x, y]`, sorted by `tDown`.
   - `tDown` is ms after the word appeared.
   - `key` is `a`–`z`, `" "` (space), `"<"` (backspace), or a key that types nothing (`shift`, `123`, `emoji`, `,`, `.`, `globe`, `mic`).
@@ -55,5 +55,5 @@ Metrics shown in the app are computed from this data, not stored:
 - **Keystrokes and backspaces**.
 
 ## Editing
-- Word pool: the `WORDS` array at the top of the script.
+- Word pool: the `WORDS` array at the top of the script (20 common texting words, 4–9 letters).
 - Keyboard geometry: `SKINS` (key sizes and positions) and the `.kb[data-skin=…]` CSS (colours).

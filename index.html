@@ -151,10 +151,10 @@ ol.steps li::before {
     <ol class="steps">
       <li>Hold your phone the way you normally do when texting (one thumb, two thumbs, whatever feels natural).</li>
       <li>Tap <b>Start</b>. A word appears at the top of the screen.</li>
-      <li>Type the word on the keyboard below. Most key labels are blank. Only the word's <b>first letter</b> and a couple of random keys are labelled.</li>
+      <li>Type the word on the keyboard below. Most key labels are blank. Only the word's <b>first letter</b> and a few random keys are labelled.</li>
       <li>What you type is <b>hidden</b>, so don't look for it. Keep going as you would normally.</li>
       <li>If you <em>feel</em> you made a mistake, you can fix it with <b>⌫</b>. When you think the word is done, tap <b>Submit</b>.</li>
-      <li>Repeat this for <b id="n-words">10</b> words.</li>
+      <li>Repeat this for <b id="n-words">5</b> words.</li>
       <li>Check your results, then tap <b>Share</b> to send your recording to the researcher.</li>
     </ol>
     <p class="note">Type as naturally and quickly as you would in a message. Don't aim for perfection: mistakes are part of what's being measured. No personal or device information is collected, only the words and your taps.</p>
@@ -220,12 +220,13 @@ ol.steps li::before {
 
 // ---------- Config ----------
 const WORDS = [
-  'because', 'tomorrow', 'tonight', 'thanks', 'really', 'people', 'should', 'something', 'anything', 'actually',
-  'probably', 'morning', 'already', 'weekend', 'birthday', 'dinner', 'pretty', 'little', 'getting', 'coming',
+  'love', 'good', 'know', 'home', 'time', 'later', 'sorry', 'happy', 'today', 'night',
+  'thanks', 'really', 'people', 'should', 'because', 'tonight', 'morning', 'tomorrow', 'probably', 'something',
 ];
+const VISIBLE_LABELS = 7; // of 26 letters, i.e. ~75% hidden: the word's first letter + 6 random others
 const LETTERS = 'abcdefghijklmnopqrstuvwxyz';
 const params = new URLSearchParams(location.search);
-const N = Math.max(1, Math.min(WORDS.length, parseInt(params.get('n'), 10) || 10));
+const N = Math.max(1, Math.min(WORDS.length, parseInt(params.get('n'), 10) || 5));
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 
@@ -598,8 +599,8 @@ async function startSession() {
   const seed = params.get('seed') || Math.random().toString(36).slice(2, 8);
   const r = rng(seed);
   S.words = shuffle([...WORDS], r).slice(0, N);
-  // Labels: the word's first letter + 2 random letters that are not in the word.
-  S.vis = S.words.map(w => [w[0], ...shuffle([...LETTERS].filter(c => !w.includes(c)), r).slice(0, 2)]);
+  // Labels: the word's first letter + random letters that are not in the word.
+  S.vis = S.words.map(w => [w[0], ...shuffle([...LETTERS].filter(c => !w.includes(c)), r).slice(0, VISIBLE_LABELS - 1)]);
   S.rec = { v: 1, kb: SKIN, seed, n: S.words.length, trials: [] };
   S.i = 0;
   S.live = true;
