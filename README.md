@@ -11,7 +11,7 @@ Pass 2 uses the same words as pass 1 in a new order, with new random labels. Eac
 ## Run / host
 - Local: `python3 -m http.server 8000`, then open `http://<your-LAN-ip>:8000/` on a phone.
 - Real use: put `index.html` on any static HTTPS host (GitHub Pages, Netlify, S3…). The native share sheet and the clipboard need HTTPS.
-- iPhone Safari can't hide its own browser bars. For true full screen, participants use **Share → Add to Home Screen**. Android Chrome switches to full screen when **Start** is tapped.
+- iPhone Safari can't hide its own browser bars. For true full screen, participants add the test to their Home Screen: the intro shows the steps for their browser (Safari, Chrome, iPad), or a link to the hosted copy when the page is embedded. Android Chrome switches to full screen when **Start** is tapped.
 
 ## URL parameters
 | Param | Meaning |
