@@ -69,6 +69,18 @@ const out = __dirname + '/out/'; require('fs').mkdirSync(out, { recursive: true 
     const p2 = await ctx.newPage(); const errs2 = []; p2.on('pageerror', e => errs2.push(e.message));
     await p2.goto(await page.evaluate(() => S.link)); await p2.waitForSelector('#s-result.on');
     console.log(skin, 'link identical:', await p2.evaluate(o => JSON.stringify(S.rec) === o, await page.evaluate(() => JSON.stringify(S.rec))));
+    // Share hands over the file (.json on iOS, .txt elsewhere), and loading that file gives back the same recording.
+    const shared = await page.evaluate(async () => {
+      let got; navigator.canShare = () => true; navigator.share = async d => { got = d.files[0]; };
+      await $('#btn-share').onclick();
+      return { name: got.name, type: got.type, text: await got.text() };
+    });
+    const p3 = await ctx.newPage(); p3.on('pageerror', e => errs2.push(e.message));
+    await p3.goto('http://localhost:8765/index.html');
+    await p3.setInputFiles('#file', { name: shared.name, mimeType: shared.type, buffer: Buffer.from(shared.text) });
+    await p3.waitForSelector('#s-result.on');
+    console.log(skin, 'shared', shared.name, shared.type, '-> loaded identical:', await p3.evaluate(o => JSON.stringify(S.rec) === o, await page.evaluate(() => JSON.stringify(S.rec))));
+    await p3.close();
     await p2.waitForTimeout(450); await p2.tap('#btn-replay');
     const replayAt = async (label, shot) => {
       await p2.evaluate(l => { Replay.pause(); Replay.select(Replay.items.findIndex(it => it.label === l)); Replay.t = Replay.end(); Replay.render(); }, label);
