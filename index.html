@@ -910,8 +910,9 @@ function fileFor(rec) {
   const name = `typing-${rec.seed || 'rec'}-${rec.n}`;
   return {
     json, name,
-    // Chrome's Web Share only allows certain extensions (.json isn't one), so fall back to .txt.
-    candidates: [new File([json], name + '.json', { type: 'application/json' }), new File([json], name + '.txt', { type: 'text/plain' })],
+    // Chrome's Web Share only allows certain extensions (.json isn't one), but its canShare()
+    // still says yes and share() then rejects — so only iOS (WebKit) gets .json; others get .txt.
+    file: IS_IOS ? new File([json], name + '.json', { type: 'application/json' }) : new File([json], name + '.txt', { type: 'text/plain' }),
   };
 }
 function download(json, name) {
@@ -923,9 +924,8 @@ function download(json, name) {
   setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 $('#btn-share').onclick = async () => {
-  const { json, name, candidates } = fileFor(S.rec);
-  const file = navigator.canShare && candidates.find(f => navigator.canShare({ files: [f] }));
-  if (file) {
+  const { json, name, file } = fileFor(S.rec);
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
     try { await navigator.share({ files: [file], title: 'Typing test recording' }); }
     catch (e) { if (e.name !== 'AbortError') { download(json, name); toast('Saved as file'); } }
     return;
