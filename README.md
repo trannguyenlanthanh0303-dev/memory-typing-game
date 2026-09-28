@@ -16,7 +16,7 @@ Pass 2 uses the same words as pass 1 in a new order, with new random labels. Eac
 ## URL parameters
 | Param | Meaning |
 |---|---|
-| `?n=5` | Words per pass (1–20, default 5) |
+| `?n=3` | Words per pass (1–20, default 3) |
 | `?seed=abc` | Fixed word order and fixed hidden labels. Give every participant the same seed to get identical tasks. |
 | `?kb=ios\|gboard\|samsung` | Force a keyboard skin. By default it's detected: iOS → `ios`, Samsung (model `SM-…`) → `samsung`, other Android → `gboard`. |
 | `#r=<data>` | A recording packed into the link. Opens the results and replay. |
@@ -37,7 +37,7 @@ To look at a file again, use **Load a recording** on the intro screen.
   "v": 2,
   "kb": "ios",
   "seed": "k3j9",
-  "n": 5,
+  "n": 3,
   "passes": [
     { "grip": "comfortable", "trials": [
       { "word": "because", "vis": ["b", "q", "x", "d", "j", "k", "w"], "ev": [[412, 88, "b", 312, 540]], "submit": 2150 }

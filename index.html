@@ -171,7 +171,7 @@ ol.steps li::before {
 
     <h2>How it works</h2>
     <ol class="steps">
-      <li>You'll type <b id="n-words">5</b> words<span class="num-only">, then <b id="n-seqs">3</b> six-digit numbers</span>, twice.</li>
+      <li>You'll type <b id="n-words">3</b> words<span class="num-only">, then <b id="n-seqs">3</b> six-digit numbers</span>, twice.</li>
       <li><b>Pass 1:</b> hold your phone however is comfortable.<br><b>Pass 2:</b> use only the thumb of your non-dominant hand.</li>
       <li>Most key labels are blank and what you type stays hidden. Type from memory, fix any mistake you feel with <b>⌫</b>, then tap <b>Submit</b>.</li>
       <li>At the end, tap <b>Share recording</b> to send it to the researcher.</li>
@@ -278,7 +278,7 @@ const SEQ_LEN = 6; // digits per number
 const VISIBLE_DIGITS = 2; // of 10: the number's first digit + 1 random digit not in it
 const DIGITS = '0123456789';
 const params = new URLSearchParams(location.search);
-const N = Math.max(1, Math.min(WORDS.length, parseInt(params.get('n'), 10) || 5));
+const N = Math.max(1, Math.min(WORDS.length, parseInt(params.get('n'), 10) || 3));
 const D = Math.max(0, Math.min(10, Number.isFinite(parseInt(params.get('d'), 10)) ? parseInt(params.get('d'), 10) : 3)); // numbers per pass
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
